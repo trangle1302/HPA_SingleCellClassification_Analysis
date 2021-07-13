@@ -89,6 +89,7 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
         gt_masks = regionprops(gt_masks)
         matched_ids = set()
         for rle in preds.keys():
+            found = False
             binary_mask = decodeToBinaryMask(rle, width, height)
             p_coords = find_coords(regionprops(binary_mask), 1)
 
@@ -110,7 +111,18 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                     # print(result)
                     results = results.append(result, ignore_index=True)
                     # print(f"Matching 1 cell takes {time.time() - s} sec")
+                    found = True
                     continue
+
+            if found:
+                result = {
+                    "Image": image_id,
+                    "Cell_ID": None,
+                    "GT cell label": None,
+                    "Predicted cell label": preds[rle],
+                    "IOU": 0,
+                }
+                results = results.append(result, ignore_index=True)
 
         cells_left = cell_idxes - matched_ids
         if len(cells_left) > 0:
