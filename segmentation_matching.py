@@ -100,6 +100,7 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                     matched_ids.add(cell_idx)
                     result = {
                         "Image": image_id,
+                        "Cell_ID": cell_idx,
                         "GT cell label": gt_labels_1image[
                             gt_labels_1image.Cell_ID == str(cell_idx)
                         ].Label.values,
@@ -110,6 +111,21 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                     results = results.append(result, ignore_index=True)
                     # print(f"Matching 1 cell takes {time.time() - s} sec")
                     continue
+
+        cells_left = cell_idxes - matched_ids
+        if len(cells_left) > 0:
+            for cell_idx in cells_left:
+                result = {
+                    "Image": image_id,
+                    "Cell_ID": cell_idx,
+                    "GT cell label": gt_labels_1image[
+                        gt_labels_1image.Cell_ID == str(cell_idx)
+                    ].Label.values,
+                    "Predicted cell label": None,
+                    "IOU": 0,
+                }
+                results = results.append(result, ignore_index=True)
+
     results.to_csv(os.path.join(save_dir, f"{pid}.csv"))
 
 
