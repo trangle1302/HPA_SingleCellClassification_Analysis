@@ -109,6 +109,6 @@ def decodeToBinaryMask(rleCodedStr, imWidth, imHeight):
     detlist = []
     detlist.append(detection)
     mask = coco_mask.decode(detlist)
-    binaryMask = mask.astype("uint8")
+    binaryMask = mask.astype("uint8")[:, :, 0]
     # print(f'Decoding 1 cell: {time.time() - s} sec') #Avg 0.0035 sec for each cell
     return binaryMask
