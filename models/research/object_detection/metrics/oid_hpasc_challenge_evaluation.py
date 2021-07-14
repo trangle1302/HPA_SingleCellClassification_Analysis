@@ -97,12 +97,13 @@ def main(unused_argv):
   flags.mark_flag_as_required('input_class_labelmap')
   flags.mark_flag_as_required('output_metrics')
 
+  is_instance_segmentation_eval = False
+  """
   all_location_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-bbox_expanded.csv")
   all_label_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-labels_expanded.csv")
   all_label_annotations.rename(
       columns={'Confidence': 'ConfidenceImageLabel'}, inplace=True)
 
-  is_instance_segmentation_eval = False
   if False: #FLAGS.input_annotations_segm:
     is_instance_segmentation_eval = True
     all_segm_annotations = pd.read_csv(FLAGS.input_annotations_segm)
@@ -113,6 +114,7 @@ def main(unused_argv):
     all_location_annotations = utils.merge_boxes_and_masks(
         all_location_annotations, all_segm_annotations)
   all_annotations = pd.concat([all_location_annotations, all_label_annotations])
+  """ 
   
   # Testing with 10 images
   if False: #FOrmatting the solution files, only need to be done once!
@@ -123,14 +125,8 @@ def main(unused_argv):
       for i, row in all_annotations_hpa.iterrows():
           pred_string = row.PredictionString.split(" ")
           for k in range(0, len(pred_string), 7):
-              compressed_mask = base64.b64decode(pred_string[k+6])
-              rle_encoded_mask = zlib.decompress(compressed_mask)
-              decoding_dict = {
-                  'size': [im_height, im_width],
-                  'counts': rle_encoded_mask
-              }
-              mask_tensor = coco_mask.decode(decoding_dict)
-              boxes = utils._to_normalized_box(mask_tensor) # ymin, xmin, ymax, xmax
+              boxes = utils._get_bbox(pred_string[k+6], row.ImageWidth,row.ImageWidth) # ymin, xmin, ymax, xmax
+              print(boxes)
               line = {
                       "ImageID":row.ID,
                       "ImageWidth":row.ImageWidth,
@@ -209,12 +205,3 @@ def main(unused_argv):
 
 if __name__ == '__main__':
   app.run(main)
-def _get_bbox(segment, image_widths,image_heights):
-     compressed_mask = base64.b64decode(pred_string[k+6])
-     rle_encoded_mask = zlib.decompress(compressed_mask)
-     decoding_dict = {
-                  'size': [im_height, im_width],
-                  'counts': rle_encoded_mask
-    }
-    mask_tensor = coco_mask.decode(decoding_dict)
-    boxes = utils._to_normalized_box(mask_tensor)
