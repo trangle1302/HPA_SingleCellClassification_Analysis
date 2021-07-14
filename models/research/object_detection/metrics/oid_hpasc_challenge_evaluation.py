@@ -51,6 +51,7 @@ from object_detection.metrics import io_utils
 from object_detection.metrics import oid_challenge_evaluation_utils as utils
 from object_detection.protos import string_int_label_map_pb2
 from object_detection.utils import object_detection_evaluation
+import time
 
 flags.DEFINE_string('all_annotations', None,
                     'File with groundtruth boxes and label annotations.')
@@ -92,6 +93,7 @@ def _load_labelmap(labelmap_path):
 
 
 def main(unused_argv):
+  s = time.time()
   flags.mark_flag_as_required('all_annotations')
   flags.mark_flag_as_required('input_predictions')
   flags.mark_flag_as_required('input_class_labelmap')
@@ -116,51 +118,49 @@ def main(unused_argv):
   all_annotations = pd.concat([all_location_annotations, all_label_annotations])
   """ 
   
-  # Testing with 10 images
-  if False: #FOrmatting the solution files, only need to be done once!
+  if False: #FOrmatting the solution files, only need to be done once!!
       all_annotations_hpa = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/_solution.csv_")
-      imlist = list(set(all_annotations_hpa.ID))[:10]
-      all_annotations_hpa = all_annotations_hpa[all_annotations_hpa.ID.isin(imlist)]
+      # Testing with 10 images
+      #imlist = list(set(all_annotations_hpa.ID))[:10]
+      #all_annotations_hpa = all_annotations_hpa[all_annotations_hpa.ID.isin(imlist)]
       all_annotations = pd.DataFrame()
       for i, row in all_annotations_hpa.iterrows():
           pred_string = row.PredictionString.split(" ")
           for k in range(0, len(pred_string), 7):
               boxes = utils._get_bbox(pred_string[k+6], row.ImageWidth,row.ImageWidth) # ymin, xmin, ymax, xmax
-              print(boxes)
               line = {
                       "ImageID":row.ID,
                       "ImageWidth":row.ImageWidth,
                       "ImageHeight":row.ImageHeight,
                       "ConfidenceImageLabel": 1, 
                       "LabelName": pred_string[k], 
-                      "XMin":pred_string[k+1],
-                      "YMin":pred_string[k+2],
-                      "XMax":pred_string[k+3],
-                      "YMax":pred_string[k+4],
+                      "XMin":boxes[1],
+                      "YMin":boxes[0],
+                      "XMax":boxes[3],
+                      "YMax":boxes[2],
                       "IsGroupOf":pred_string[k+5],
-                      "Mask": np.expand_dims(mask_tensor, 0), #pred_string[k+6]
+                      "Mask": pred_string[k+6]
                 }
-              print(line)
               """
               binary_mask = decodeToBinaryMask(pred_string[k+6], row.ImageWidth, row.ImageHeight)
               plt.figure()
               plt.imshow(binary_mask)
               """
-              #all_annotations = all_annotations.append(line, ignore_index=True)
+              all_annotations = all_annotations.append(line, ignore_index=True)
       all_annotations_hpa.to_csv("/home/trangle/HPA_SingleCellClassification/all_annotations.csv", index=False)
-  all_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/all_annotations.csv")
+  all_annotations = pd.read_csv(FLAGS.all_annotations)
   all_annotations['ImageHeight'] = all_annotations['ImageHeight'].astype(int)
   all_annotations['ImageWidth'] = all_annotations['ImageWidth'].astype(int)
-  all_annotations['Mask'] = all_annotations['ImageWidth'].astype(int)
-  class_label_map, categories = _load_labelmap("/home/trangle/HPA_SingleCellClassification/GT/hpa_single_cell_label_map.pbtxt")
+  
+  class_label_map, categories = _load_labelmap(FLAGS.input_class_labelmap)
   #class_label_map, categories = _load_labelmap("/home/trangle/HPA_SingleCellClassification/models/research/object_detection/data/oid_object_detection_challenge_500_label_map.pbtxt")
   challenge_evaluator = (
       object_detection_evaluation.OpenImagesChallengeEvaluator(
-          categories, evaluate_masks=is_instance_segmentation_eval))
-
-  #submissions = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/sample_truncated_submission.csv")
-  submissions = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/bestfitting/bestfitting_submission.csv")
-  submissions = submissions[submissions.ID.isin(imlist)]
+          categories, evaluate_masks=is_instance_segmentation_eval, matching_iou_threshold=0.6))
+ 
+  submissions = pd.read_csv(FLAGS.input_predictions)      
+  # Testing with 10 images
+  #submissions = submissions[submissions.ID.isin(all_annotations.ImageID)]
   all_predictions = pd.DataFrame()
   for i, row in submissions.iterrows():
       try:
@@ -180,7 +180,8 @@ def main(unused_argv):
                 all_predictions = all_predictions.append(line, ignore_index=True)
       except:
           continue
-      
+  all_predictions.to_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"), index=False)
+  
   images_processed = 0
   for _, groundtruth in enumerate(all_annotations.groupby('ImageID')):
     logging.info('Processing image %d', images_processed)
@@ -199,9 +200,10 @@ def main(unused_argv):
 
   metrics = challenge_evaluator.evaluate()
 
-  with open("/home/trangle/HPA_SingleCellClassification/examples/OID/sample_outputmetrics.csv", 'w') as fid:
+  with open(FLAGS.output_metrics, 'w') as fid:
     io_utils.write_csv(fid, metrics)
 
 
+  print(f'Finished in {(time.time() - s)/3600} hour')
 if __name__ == '__main__':
   app.run(main)
