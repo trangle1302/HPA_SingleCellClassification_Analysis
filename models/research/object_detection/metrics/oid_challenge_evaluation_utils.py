@@ -99,6 +99,18 @@ def _decode_raw_data_into_masks_and_boxes(segments, image_widths,
       segment_masks, axis=0), np.concatenate(
           segment_boxes, axis=0)
 
+
+def _get_bbox(segment, im_width, im_height):
+    compressed_mask = base64.b64decode(segment)
+    rle_encoded_mask = zlib.decompress(compressed_mask)
+    decoding_dict = {
+                  'size': [im_height, im_width],
+                  'counts': rle_encoded_mask
+    }
+    mask_tensor = coco_mask.decode(decoding_dict)
+    boxes = _to_normalized_box(mask_tensor)
+    return boxes
+
 def merge_boxes_and_masks(box_data, mask_data):
   return pd.merge(
       box_data,
