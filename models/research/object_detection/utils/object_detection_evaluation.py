@@ -197,8 +197,8 @@ class ObjectDetectionEvaluator(DetectionEvaluator):
     """
     super(ObjectDetectionEvaluator, self).__init__(categories)
     self._num_classes = max([cat['id'] for cat in categories])
-    #if min(cat['id'] for cat in categories) < 1:
-    #  raise ValueError('Classes should be 1-indexed.')
+    if min(cat['id'] for cat in categories) < 1:
+      raise ValueError('Classes should be 1-indexed.')
     self._matching_iou_threshold = matching_iou_threshold
     self._recall_lower_bound = recall_lower_bound
     self._recall_upper_bound = recall_upper_bound
