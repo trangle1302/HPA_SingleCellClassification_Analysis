@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+from scipy.ndimage.measurements import mean
 from sklearn.metrics import jaccard_similarity_score
 from utils import *
 import matplotlib.pyplot as plt
@@ -18,15 +19,14 @@ def __main__(process_num=20):
     )
     gt_labels["Image_ID"] = [f.split("_")[0] for f in gt_labels.ID]
     gt_labels["Cell_ID"] = [f.split("_")[1] for f in gt_labels.ID]
-
+    print(f"GT labels have {len(gt_labels)} cells")
     # gt_mask_dir = "W:\home\trangle\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\data"
     # gt_labels = pd.read_csv("W:\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\labels.csv")
-    save_dir = "/home/trangle/HPA_SingleCellClassification/examples/redai"
-    # pred_mask_path = "/home/trangle/HPA_SingleCellClassification/examples/redai/redai_submission.csv"
-    pred_mask_path = (
-        "/home/trangle/HPA_SingleCellClassification/examples/redai/redai_submission.csv"
-    )
+    save_dir = "/home/trangle/HPA_SingleCellClassification/predictions/redai"
+    # pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
+    pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
     pred = pd.read_csv(pred_mask_path)
+    """
     s = time.time()
     os.makedirs(save_dir, exist_ok=True)
     print("Parent process %s." % os.getpid())
@@ -48,6 +48,8 @@ def __main__(process_num=20):
     p.close()
     p.join()
     print(f"All subprocesses done. {time.time()-s} sec")
+    """
+    merge_df(save_dir)
 
 
 def run_proc(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
@@ -139,6 +141,20 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                 results = results.append(result, ignore_index=True)
 
     results.to_csv(os.path.join(save_dir, f"{pid}.csv"))
+
+
+def merge_df(d):
+    files = [f for f in os.listdir(d) if not f.endswith("_submission.csv")]
+    df = pd.DataFrame()
+    for f in files:
+        df_ = pd.read_csv(os.path.join(d, f))
+        df = df.append(df_, ignore_index=True)
+    df.to_csv(os.path.join(d, f"merged.csv"))
+    df_ = df[df["GT cell label"] != None]
+    # print(df_.columns)
+    # print(f"matched {sum(df_.Cell_ID.isna()==False)}/{len(df_)} cells")
+    df_ = df_.groupby(["Image", "Cell_ID"])
+    print(f"Mean IOU: {df_.IOU.mean().values}, {len(df_)} cells")
 
 
 if __name__ == "__main__":
