@@ -52,6 +52,7 @@ from object_detection.metrics import oid_challenge_evaluation_utils as utils
 from object_detection.protos import string_int_label_map_pb2
 from object_detection.utils import object_detection_evaluation
 import time
+import tqdm
 
 flags.DEFINE_string('all_annotations', None,
                     'File with groundtruth boxes and label annotations.')
@@ -162,7 +163,7 @@ def main(unused_argv):
   # Testing with 10 images
   #submissions = submissions[submissions.ID.isin(all_annotations.ImageID)]
   all_predictions = pd.DataFrame()
-  for i, row in submissions.iterrows():
+  for i, row in tqdm.tqdm(submissions.iterrows(),total=submissions.shape[0]):
       try:
           pred_string = row.PredictionString.split(" ")
           for k in range(0, len(pred_string), 3):
