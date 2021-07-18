@@ -162,7 +162,8 @@ def main(unused_argv):
   submissions = pd.read_csv(FLAGS.input_predictions)      
   # Testing with 10 images
   #submissions = submissions[submissions.ID.isin(all_annotations.ImageID)]
-  all_predictions = pd.DataFrame()
+  f = open(FLAGS.input_predictions.replace(".csv","_formatted.csv"), "a+")
+  f.write("ImageID,ImageWidth,ImageHeight,LabelName,Score,Mask\n")
   for i, row in tqdm.tqdm(submissions.iterrows(),total=submissions.shape[0]):
       try:
           pred_string = row.PredictionString.split(" ")
@@ -170,18 +171,12 @@ def main(unused_argv):
                 label = pred_string[k]
                 conf = pred_string[k + 1]
                 rle = pred_string[k + 2]
-                line = {
-                        "ImageID":row.ID,
-                        "ImageWidth":row.ImageWidth,
-                        "ImageHeight":row.ImageHeight,
-                        "LabelName":str(label),
-                        "Score":conf,
-                        "Mask":rle,
-                }
-                all_predictions = all_predictions.append(line, ignore_index=True)
+                line = f"{row.ID},{row.ImageWidth},{row.ImageHeight},{str(label)},{conf},{rle}\n"
+                f.write(line)
       except:
           continue
-  all_predictions.to_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"), index=False)
+
+  all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
   
   images_processed = 0
   for _, groundtruth in enumerate(all_annotations.groupby('ImageID')):
