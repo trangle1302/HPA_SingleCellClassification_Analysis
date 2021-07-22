@@ -42,6 +42,8 @@ from __future__ import print_function
 
 import logging
 
+import os
+import tqdm
 from absl import app
 from absl import flags
 import pandas as pd
@@ -123,6 +125,25 @@ def main(unused_argv):
           categories, evaluate_masks=is_instance_segmentation_eval))
 
   all_predictions = pd.read_csv(FLAGS.input_predictions)
+  print(all_predictions.head())
+  if not os.path.exists(FLAGS.input_predictions.replace(".csv","_formatted.csv")):
+    submissions = pd.read_csv(FLAGS.input_predictions)   
+    f = open(FLAGS.input_predictions.replace(".csv","_formatted.csv"), "a+")
+    f.write("ImageID,ImageWidth,ImageHeight,LabelName,Score,Mask\n")
+    for i, row in tqdm.tqdm(submissions.iterrows(),total=submissions.shape[0]):
+        try:
+            pred_string = row.PredictionString.split(" ")
+            for k in range(0, len(pred_string), 3):
+                  label = pred_string[k]
+                  conf = pred_string[k + 1]
+                  rle = pred_string[k + 2]
+                  line = f"{row.ID},{row.ImageWidth},{row.ImageHeight},{str(label)},{conf},{rle}\n"
+                  f.write(line)
+        except:
+            continue
+  
+  all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
+  print(all_predictions.head())
   images_processed = 0
   for _, groundtruth in enumerate(all_annotations.groupby('ImageID')):
     logging.info('Processing image %d', images_processed)
