@@ -56,7 +56,7 @@ import tqdm
 import os
 import cProfile, pstats, io
 from pstats import SortKey
-from multiprocessing import Process, Lock
+from multiprocessing import Pool, Manager
 
 flags.DEFINE_string('all_annotations', None,
                     'File with groundtruth boxes and label annotations.')
@@ -98,7 +98,7 @@ def _load_labelmap(labelmap_path):
 
 
 def main(unused_argv):
-  s = time.time()
+  st = time.time()
   flags.mark_flag_as_required('all_annotations')
   flags.mark_flag_as_required('input_predictions')
   flags.mark_flag_as_required('input_class_labelmap')
@@ -183,40 +183,60 @@ def main(unused_argv):
         except:
             continue
 
-  pr = cProfile.Profile()
-  pr.enable()
+  #pr = cProfile.Profile()
+  #pr.enable()
   all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
   all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
-  print(len(all_predictions), all_annotations.ImageID.nunique())
   images_processed = 0
-  for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
-    #if images_processed == 20:
-    #  pass
-    #logging.info('Processing image %d', images_processed)
-    image_id, image_groundtruth = groundtruth
-    groundtruth_dictionary = utils.build_groundtruth_dictionary(
-        image_groundtruth, class_label_map)
-    challenge_evaluator.add_single_ground_truth_image_info(
-        image_id, groundtruth_dictionary)
-
-    prediction_dictionary = utils.build_predictions_dictionary(
-        all_predictions.loc[all_predictions['ImageID'] == image_id],
-        class_label_map)
-    challenge_evaluator.add_single_detected_image_info(image_id,
-                                                       prediction_dictionary)
-    images_processed += 1
+  manager = Manager()
+  lock = manager.Lock()
+  with Pool(processes=20) as p:
+  #if True:
+    for index, groundtruth in enumerate(all_annotations.groupby('ImageID')):
+      #if images_processed == 20:
+      #  pass
+      #logging.info('Processing image %d', images_processed)
+      image_id, image_groundtruth = groundtruth
+      image_predictions =  all_predictions[all_predictions.ImageID == image_id]
+      
+      #import pdb; pdb.set_trace()
+      #add_image_gt_p(image_id, image_groundtruth, class_label_map, image_predictions, challenge_evaluator, lock)
+      _ = p.apply_async(add_image_gt_p, args=(image_id, image_groundtruth, class_label_map, image_predictions, challenge_evaluator, lock))
+    p.close()
+    p.join()
   metrics = challenge_evaluator.evaluate()
 
   with open(FLAGS.output_metrics, 'w') as fid:
     io_utils.write_csv(fid, metrics)
 
-  pr.disable()
-  s = io.StringIO()
-  sortby = SortKey.CUMULATIVE
-  ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-  ps.print_stats()
-  print(s.getvalue())
+  #pr.disable()
+  #s = io.StringIO()
+  #sortby = SortKey.CUMULATIVE
+  #ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+  #ps.print_stats()
+  #print(s.getvalue())
 
-  print(f'Finished in {(time.time() - s)/3600} hour')
+  print(f'Finished in {(time.time() - st)/3600} hour')
+
+
+def add_image_gt_p(image_id, image_groundtruth, class_label_map, predictions, challenge_evaluator, lock):
+  groundtruth_dictionary = utils.build_groundtruth_dictionary(
+    image_groundtruth, class_label_map)
+
+  prediction_dictionary = utils.build_predictions_dictionary(
+    predictions, class_label_map)
+
+  lock.acquire()
+  #print(image_id, flush=True)
+
+  challenge_evaluator.add_single_ground_truth_image_info(
+    image_id, groundtruth_dictionary)
+  #print('Dwarf:', groundtruth_dictionary, flush=True)
+  
+  challenge_evaluator.add_single_detected_image_info(image_id,
+  prediction_dictionary)
+  #print('Elf:', prediction_dictionary, flush=True)
+  lock.release()
+
 if __name__ == '__main__':
   app.run(main)
