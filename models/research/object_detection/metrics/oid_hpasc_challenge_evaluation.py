@@ -180,9 +180,12 @@ def main(unused_argv):
 
   all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
   all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
+  print(len(all_predictions), all_annotations.ImageID.nunique())
   images_processed = 0
-  for _, groundtruth in enumerate(all_annotations.groupby('ImageID')):
-    logging.info('Processing image %d', images_processed)
+  for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
+    #if images_processed == 20:
+    #  pass
+    #logging.info('Processing image %d', images_processed)
     image_id, image_groundtruth = groundtruth
     groundtruth_dictionary = utils.build_groundtruth_dictionary(
         image_groundtruth, class_label_map)
