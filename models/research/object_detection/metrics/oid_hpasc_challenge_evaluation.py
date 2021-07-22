@@ -54,6 +54,9 @@ from object_detection.utils import object_detection_evaluation
 import time
 import tqdm
 import os
+import cProfile, pstats, io
+from pstats import SortKey
+from multiprocessing import Process, Lock
 
 flags.DEFINE_string('all_annotations', None,
                     'File with groundtruth boxes and label annotations.')
@@ -153,7 +156,9 @@ def main(unused_argv):
   all_annotations = pd.read_csv(FLAGS.all_annotations)
   all_annotations['ImageHeight'] = all_annotations['ImageHeight'].astype(int)
   all_annotations['ImageWidth'] = all_annotations['ImageWidth'].astype(int)
-  
+  imlist = list(set(all_annotations.ImageID))[:50]
+  all_annotations = all_annotations[all_annotations.ImageID.isin(imlist)]
+
   class_label_map, categories = _load_labelmap(FLAGS.input_class_labelmap)
   #class_label_map, categories = _load_labelmap("/home/trangle/HPA_SingleCellClassification/models/research/object_detection/data/oid_object_detection_challenge_500_label_map.pbtxt")
   challenge_evaluator = (
@@ -178,6 +183,8 @@ def main(unused_argv):
         except:
             continue
 
+  pr = cProfile.Profile()
+  pr.enable()
   all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
   all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
   print(len(all_predictions), all_annotations.ImageID.nunique())
@@ -198,12 +205,17 @@ def main(unused_argv):
     challenge_evaluator.add_single_detected_image_info(image_id,
                                                        prediction_dictionary)
     images_processed += 1
-
   metrics = challenge_evaluator.evaluate()
 
   with open(FLAGS.output_metrics, 'w') as fid:
     io_utils.write_csv(fid, metrics)
 
+  pr.disable()
+  s = io.StringIO()
+  sortby = SortKey.CUMULATIVE
+  ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+  ps.print_stats()
+  print(s.getvalue())
 
   print(f'Finished in {(time.time() - s)/3600} hour')
 if __name__ == '__main__':
