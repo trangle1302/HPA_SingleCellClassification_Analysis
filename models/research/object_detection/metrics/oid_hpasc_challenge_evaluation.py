@@ -123,16 +123,21 @@ def main(unused_argv):
   all_annotations = pd.concat([all_location_annotations, all_label_annotations])
   """ 
   
-  if False: #FOrmatting the solution files, only need to be done once!!
+  if False: #Formatting the solution files, only need to be done once!!
       all_annotations_hpa = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/_solution.csv_")
+      f = open(FLAGS.all_annotations, "a+")
+      f.write("ImageID,ImageWidth,ImageHeight,ConfidenceImageLabel,LabelName,XMin,YMin,XMax,YMax,IsGroupOf,Mask\n")
       # Testing with 10 images
       #imlist = list(set(all_annotations_hpa.ID))[:10]
       #all_annotations_hpa = all_annotations_hpa[all_annotations_hpa.ID.isin(imlist)]
-      all_annotations = pd.DataFrame()
       for i, row in all_annotations_hpa.iterrows():
           pred_string = row.PredictionString.split(" ")
           for k in range(0, len(pred_string), 7):
               boxes = utils._get_bbox(pred_string[k+6], row.ImageWidth,row.ImageWidth) # ymin, xmin, ymax, xmax
+              if pred_string[k+6] == '-1':
+                continue
+              line = f"{row.ID},{row.ImageWidth},{row.ImageHeight},1,{pred_string[k]},{boxes[1]},{boxes[0]},{boxes[3]},{boxes[2]},{pred_string[k+5]},{pred_string[k+6]}\n"
+              '''
               line = {
                       "ImageID":row.ID,
                       "ImageWidth":row.ImageWidth,
@@ -146,18 +151,17 @@ def main(unused_argv):
                       "IsGroupOf":pred_string[k+5],
                       "Mask": pred_string[k+6]
                 }
-              """
-              binary_mask = decodeToBinaryMask(pred_string[k+6], row.ImageWidth, row.ImageHeight)
-              plt.figure()
-              plt.imshow(binary_mask)
-              """
-              all_annotations = all_annotations.append(line, ignore_index=True)
-      all_annotations_hpa.to_csv("/home/trangle/HPA_SingleCellClassification/all_annotations.csv", index=False)
-  all_annotations = pd.read_csv(FLAGS.all_annotations)
-  all_annotations['ImageHeight'] = all_annotations['ImageHeight'].astype(int)
+              '''
+              print(line)
+              f.write(line)
+      f.close()
+      
+  all_annotations = pd.read_csv(FLAGS.all_annotations, header=0)
+  all_annotations['ImageHeight'] = all_annotations['ImageHeight'].astype(str).astype(int)
   all_annotations['ImageWidth'] = all_annotations['ImageWidth'].astype(int)
-  imlist = list(set(all_annotations.ImageID))[:50]
-  all_annotations = all_annotations[all_annotations.ImageID.isin(imlist)]
+  # Testing with last 20 images
+  # imlist = list(set(all_annotations.ImageID))[-20:]
+  # all_annotations = all_annotations[all_annotations.ImageID.isin(imlist)]
 
   class_label_map, categories = _load_labelmap(FLAGS.input_class_labelmap)
   #class_label_map, categories = _load_labelmap("/home/trangle/HPA_SingleCellClassification/models/research/object_detection/data/oid_object_detection_challenge_500_label_map.pbtxt")
@@ -183,11 +187,10 @@ def main(unused_argv):
         except:
             continue
 
-  pr = cProfile.Profile()
-  pr.enable()
+  #pr = cProfile.Profile()
+  #pr.enable()
   all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
   all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
-  print(len(all_predictions), all_annotations.ImageID.nunique())
   images_processed = 0
   for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
     #if images_processed == 20:
@@ -210,12 +213,12 @@ def main(unused_argv):
   with open(FLAGS.output_metrics, 'w') as fid:
     io_utils.write_csv(fid, metrics)
 
-  pr.disable()
-  s = io.StringIO()
-  sortby = SortKey.CUMULATIVE
-  ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-  ps.print_stats()
-  print(s.getvalue())
+  #pr.disable()
+  #s = io.StringIO()
+  #sortby = SortKey.CUMULATIVE
+  #ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+  #ps.print_stats()
+  #print(s.getvalue())
 
   print(f'Finished in {(time.time() - s)/3600} hour')
 if __name__ == '__main__':
