@@ -12,7 +12,7 @@ from skimage.measure import regionprops
 import time
 
 
-def __main__(process_num=20):
+def __main__(process_num=10):
     gt_mask_dir = "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/data"
     gt_labels = pd.read_csv(
         "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv"
@@ -22,10 +22,11 @@ def __main__(process_num=20):
     print(f"GT labels have {len(gt_labels)} cells")
     # gt_mask_dir = "W:\home\trangle\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\data"
     # gt_labels = pd.read_csv("W:\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\labels.csv")
-    save_dir = "/home/trangle/HPA_SingleCellClassification/predictions/redai"
+    save_dir = "/home/trangle/HPA_SingleCellClassification/predictions/bestfitting"
     # pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
     pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
     pred = pd.read_csv(pred_mask_path)
+    meta = pd.read_csv("/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv")
     """
     s = time.time()
     os.makedirs(save_dir, exist_ok=True)
@@ -49,7 +50,7 @@ def __main__(process_num=20):
     p.join()
     print(f"All subprocesses done. {time.time()-s} sec")
     """
-    merge_df(save_dir)
+    merge_df(save_dir, meta)
 
 
 def run_proc(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
@@ -143,14 +144,15 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
     results.to_csv(os.path.join(save_dir, f"{pid}.csv"))
 
 
-def merge_df(d):
+def merge_df(d, meta):
     files = [f for f in os.listdir(d) if not f.endswith("_submission.csv")]
     df = pd.DataFrame()
     for f in files:
         df_ = pd.read_csv(os.path.join(d, f))
         df = df.append(df_, ignore_index=True)
-    df.to_csv(os.path.join(d, f"merged.csv"))
-    df_ = df[df["GT cell label"] != None]
+    df_merged = df.merge(meta, right_on="Image_ID", left_on="Image")
+    df_merged.to_csv(os.path.join(d, f"merged.csv"))
+    df_ = df_merged[df_merged["GT cell label"] != None]
     # print(df_.columns)
     # print(f"matched {sum(df_.Cell_ID.isna()==False)}/{len(df_)} cells")
     df_ = df_.groupby(["Image", "Cell_ID"])
