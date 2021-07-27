@@ -13,9 +13,9 @@ import time
 
 
 def __main__(process_num=10):
-    gt_mask_dir = "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/data"
+    gt_mask_dir = "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/publictest"
     gt_labels = pd.read_csv(
-        "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv"
+        "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/publictest/labels_publictest.csv"
     )
     gt_labels["Image_ID"] = [f.split("_")[0] for f in gt_labels.ID]
     gt_labels["Cell_ID"] = [f.split("_")[1] for f in gt_labels.ID]
@@ -24,8 +24,9 @@ def __main__(process_num=10):
     # gt_labels = pd.read_csv("W:\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\labels.csv")
     save_dir = "/home/trangle/HPA_SingleCellClassification/predictions/bestfitting"
     # pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
-    pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
+    pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/bestfitting/en_m6_2image_4cell_0508_complet_v14.csv"
     pred = pd.read_csv(pred_mask_path)
+    pred = pred[pred.ID.isin(gt_labels.Image_ID)]
     meta = pd.read_csv("/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv")
     """
     s = time.time()
