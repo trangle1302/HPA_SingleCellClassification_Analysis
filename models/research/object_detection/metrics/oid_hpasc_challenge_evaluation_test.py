@@ -199,15 +199,17 @@ def main(unused_argv):
         image_groundtruth, class_label_map)
     challenge_evaluator.add_single_ground_truth_image_info(
         image_id, groundtruth_dictionary)
-    print(groundtruth_dictionary)
+    print(challenge_evaluator._evaluatable_labels[image_id])
 
     prediction_dictionary = utils.build_predictions_dictionary(
         all_predictions.loc[all_predictions['ImageID'] == image_id],
         class_label_map)
-        
-    print(prediction_dictionary)
+    
     challenge_evaluator.add_single_detected_image_info(image_id,
                                                        prediction_dictionary)
+    print(challenge_evaluator._label_id_offset)
+    print(challenge_evaluator._evaluation)
+    print(challenge_evaluator.per_image_eval)
     images_processed += 1
   metrics = challenge_evaluator.evaluate()
 
