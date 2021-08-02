@@ -199,7 +199,7 @@ def main(unused_argv):
         image_groundtruth, class_label_map)
     challenge_evaluator.add_single_ground_truth_image_info(
         image_id, groundtruth_dictionary)
-    print(challenge_evaluator._evaluatable_labels[image_id])
+    print('evaluable_labels', challenge_evaluator._evaluatable_labels[image_id])
 
     prediction_dictionary = utils.build_predictions_dictionary(
         all_predictions.loc[all_predictions['ImageID'] == image_id],
@@ -207,12 +207,12 @@ def main(unused_argv):
     
     challenge_evaluator.add_single_detected_image_info(image_id,
                                                        prediction_dictionary)
-    print(challenge_evaluator._label_id_offset)
-    print(challenge_evaluator._evaluation)
-    print(challenge_evaluator.per_image_eval)
+    print('label_id_offset', challenge_evaluator._label_id_offset)
+    print(challenge_evaluator._evaluation.get_internal_state().num_gt_instances_per_class)
+    #print(challenge_evaluator.scores_per_class)
     images_processed += 1
   metrics = challenge_evaluator.evaluate()
-
+  print('corlocs', challenge_evaluator._evaluate_corlocs)
   with open(FLAGS.output_metrics, 'w') as fid:
     io_utils.write_csv(fid, metrics)
 
