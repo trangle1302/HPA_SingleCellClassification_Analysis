@@ -20,7 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import csv
-
+import pickle
 
 def write_csv(fid, metrics):
   """Writes metrics key-value pairs to CSV file.
@@ -32,3 +32,11 @@ def write_csv(fid, metrics):
   metrics_writer = csv.writer(fid, delimiter=',')
   for metric_name, metric_value in metrics.items():
     metrics_writer.writerow([metric_name, str(metric_value)])
+
+def save_obj(obj, dir, name):
+    with open(dir + '/obj/'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+def load_obj(dir, name):
+    with open(dir + '/obj/' + name + '.pkl', 'rb') as f:
+        return pickle.load(f)
