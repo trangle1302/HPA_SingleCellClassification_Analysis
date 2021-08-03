@@ -159,8 +159,11 @@ def main(unused_argv):
   all_annotations = pd.read_csv(FLAGS.all_annotations, header=0)
   all_annotations['ImageHeight'] = all_annotations['ImageHeight'].astype(str).astype(int)
   all_annotations['ImageWidth'] = all_annotations['ImageWidth'].astype(int)
+  private_df = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/labels_privatetest.csv")
+  imlist = list(set(private_df.ImageID))[:2]
+  print(len(imlist))
   # Testing with last 3 images
-  imlist = list(set(all_annotations.ImageID))[-3:]
+  # imlist = list(set(all_annotations.ImageID))[-3:]
   all_annotations = all_annotations[all_annotations.ImageID.isin(imlist)]
 
   class_label_map, categories = _load_labelmap(FLAGS.input_class_labelmap)
@@ -211,6 +214,7 @@ def main(unused_argv):
     print(challenge_evaluator._evaluation.get_internal_state().num_gt_instances_per_class)
     #print(challenge_evaluator.scores_per_class)
     images_processed += 1
+  io_utils.save_obj(challenge_evaluator._evaluation.get_internal_state(), os.path.dirname(FLAGS.output_metrics), 'internal_state')
   metrics = challenge_evaluator.evaluate()
   print('corlocs', challenge_evaluator._evaluate_corlocs)
   with open(FLAGS.output_metrics, 'w') as fid:
