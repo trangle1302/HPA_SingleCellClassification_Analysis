@@ -160,7 +160,7 @@ def main(unused_argv):
   all_annotations['ImageHeight'] = all_annotations['ImageHeight'].astype(str).astype(int)
   all_annotations['ImageWidth'] = all_annotations['ImageWidth'].astype(int)
   private_df = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/labels_privatetest.csv")
-  imlist = list(set(private_df.ImageID))[:2]
+  imlist = list(set(private_df.ImageID))
   print(len(imlist))
   # Testing with last 3 images
   # imlist = list(set(all_annotations.ImageID))[-3:]
@@ -202,7 +202,7 @@ def main(unused_argv):
         image_groundtruth, class_label_map)
     challenge_evaluator.add_single_ground_truth_image_info(
         image_id, groundtruth_dictionary)
-    print('evaluable_labels', challenge_evaluator._evaluatable_labels[image_id])
+    #print('evaluable_labels', challenge_evaluator._evaluatable_labels[image_id])
 
     prediction_dictionary = utils.build_predictions_dictionary(
         all_predictions.loc[all_predictions['ImageID'] == image_id],
@@ -210,8 +210,8 @@ def main(unused_argv):
     
     challenge_evaluator.add_single_detected_image_info(image_id,
                                                        prediction_dictionary)
-    print('label_id_offset', challenge_evaluator._label_id_offset)
-    print(challenge_evaluator._evaluation.get_internal_state().num_gt_instances_per_class)
+    #print('label_id_offset', challenge_evaluator._label_id_offset)
+    #print(challenge_evaluator._evaluation.get_internal_state().num_gt_instances_per_class)
     #print(challenge_evaluator.scores_per_class)
     images_processed += 1
   io_utils.save_obj(challenge_evaluator._evaluation.get_internal_state(), os.path.dirname(FLAGS.output_metrics), 'internal_state')
