@@ -171,9 +171,9 @@ def main(unused_argv):
   all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
 
   for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
+    image_id, image_groundtruth = groundtruth
     if image_id in images_processed:
       continue
-    image_id, image_groundtruth = groundtruth
     groundtruth_dictionary = utils.build_groundtruth_dictionary(
         image_groundtruth, class_label_map)
     challenge_evaluator.add_single_ground_truth_image_info(
