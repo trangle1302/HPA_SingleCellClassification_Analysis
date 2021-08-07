@@ -105,6 +105,7 @@ def main(unused_argv):
   flags.mark_flag_as_required('output_metrics')
 
   is_instance_segmentation_eval = False
+  resume = False
   """
   all_location_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-bbox_expanded.csv")
   all_label_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-labels_expanded.csv")
@@ -161,7 +162,6 @@ def main(unused_argv):
   all_annotations['ImageWidth'] = all_annotations['ImageWidth'].astype(int)
   private_df = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/labels_privatetest.csv")
   imlist = list(set(private_df.ImageID))
-  print(len(imlist))
   # Testing with last 3 images
   # imlist = list(set(all_annotations.ImageID))[-3:]
   all_annotations = all_annotations[all_annotations.ImageID.isin(imlist)]
@@ -171,7 +171,17 @@ def main(unused_argv):
   challenge_evaluator = (
       object_detection_evaluation.OpenImagesChallengeEvaluator(
           categories, evaluate_masks=is_instance_segmentation_eval, matching_iou_threshold=0.6))
- 
+  if resume:
+    if os.path.exists(os.path.join(os.path.dirname(FLAGS.output_metrics), 'obj', 'internal_state.pkl')):
+      current_state = io_utils.load_obj(os.path.dirname(FLAGS.output_metrics), 'internal_state')
+      challenge_evaluator._evaluation.merge_internal_state(current_state)
+      images_processed = io_utils.load_obj(os.path.dirname(FLAGS.output_metrics), 'images_processed')
+      print(current_state)
+    else:
+      print('no internal state file, start from scratch')
+      images_processed = []
+  else:
+    images_processed = []
   if not os.path.exists(FLAGS.input_predictions.replace(".csv","_formatted.csv")):
     submissions = pd.read_csv(FLAGS.input_predictions)      
     f = open(FLAGS.input_predictions.replace(".csv","_formatted.csv"), "a+")
@@ -192,12 +202,13 @@ def main(unused_argv):
   #pr.enable()
   all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
   all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
-  images_processed = 0
+
   for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
     #if images_processed == 20:
     #  pass
-    #logging.info('Processing image %d', images_processed)
     image_id, image_groundtruth = groundtruth
+    if image_id in images_processed:
+      continue
     groundtruth_dictionary = utils.build_groundtruth_dictionary(
         image_groundtruth, class_label_map)
     challenge_evaluator.add_single_ground_truth_image_info(
@@ -213,10 +224,11 @@ def main(unused_argv):
     #print('label_id_offset', challenge_evaluator._label_id_offset)
     #print(challenge_evaluator._evaluation.get_internal_state().num_gt_instances_per_class)
     #print(challenge_evaluator.scores_per_class)
-    images_processed += 1
-  io_utils.save_obj(challenge_evaluator._evaluation.get_internal_state(), os.path.dirname(FLAGS.output_metrics), 'internal_state')
+    images_processed += [image_id]
+    io_utils.save_obj(images_processed, os.path.dirname(FLAGS.output_metrics), 'images_processed')
+    io_utils.save_obj(challenge_evaluator._evaluation.get_internal_state(), os.path.dirname(FLAGS.output_metrics), 'internal_state')
   metrics = challenge_evaluator.evaluate()
-  print('corlocs', challenge_evaluator._evaluate_corlocs)
+  #print('corlocs', challenge_evaluator._evaluate_corlocs)
   with open(FLAGS.output_metrics, 'w') as fid:
     io_utils.write_csv(fid, metrics)
 
