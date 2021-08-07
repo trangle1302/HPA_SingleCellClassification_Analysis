@@ -106,24 +106,7 @@ def main(unused_argv):
 
   is_instance_segmentation_eval = False
   resume = False
-  """
-  all_location_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-bbox_expanded.csv")
-  all_label_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-labels_expanded.csv")
-  all_label_annotations.rename(
-      columns={'Confidence': 'ConfidenceImageLabel'}, inplace=True)
 
-  if False: #FLAGS.input_annotations_segm:
-    is_instance_segmentation_eval = True
-    all_segm_annotations = pd.read_csv(FLAGS.input_annotations_segm)
-    # Note: this part is unstable as it requires the float point numbers in both
-    # csvs are exactly the same;
-    # Will be replaced by more stable solution: merge on LabelName and ImageID
-    # and filter down by IoU.
-    all_location_annotations = utils.merge_boxes_and_masks(
-        all_location_annotations, all_segm_annotations)
-  all_annotations = pd.concat([all_location_annotations, all_label_annotations])
-  """ 
-  
   if False: #Formatting the solution files, only need to be done once!!
       all_annotations_hpa = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/_solution.csv_")
       f = open(FLAGS.all_annotations, "a+")
@@ -138,21 +121,6 @@ def main(unused_argv):
               if pred_string[k+6] == '-1':
                 continue
               line = f"{row.ID},{row.ImageWidth},{row.ImageHeight},1,{pred_string[k]},{boxes[1]},{boxes[0]},{boxes[3]},{boxes[2]},{pred_string[k+5]},{pred_string[k+6]}\n"
-              '''
-              line = {
-                      "ImageID":row.ID,
-                      "ImageWidth":row.ImageWidth,
-                      "ImageHeight":row.ImageHeight,
-                      "ConfidenceImageLabel": 1, 
-                      "LabelName": pred_string[k], 
-                      "XMin":boxes[1],
-                      "YMin":boxes[0],
-                      "XMax":boxes[3],
-                      "YMax":boxes[2],
-                      "IsGroupOf":pred_string[k+5],
-                      "Mask": pred_string[k+6]
-                }
-              '''
               print(line)
               f.write(line)
       f.close()
@@ -182,6 +150,7 @@ def main(unused_argv):
       images_processed = []
   else:
     images_processed = []
+
   if not os.path.exists(FLAGS.input_predictions.replace(".csv","_formatted.csv")):
     submissions = pd.read_csv(FLAGS.input_predictions)      
     f = open(FLAGS.input_predictions.replace(".csv","_formatted.csv"), "a+")
