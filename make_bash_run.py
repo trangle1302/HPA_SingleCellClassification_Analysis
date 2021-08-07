@@ -12,7 +12,7 @@ file = os.listdir(args.folder)[0]
 name = args.folder.split("/")[-2]
 name = re.search(r"\d+", name)[0]
 
-ALL_GT_ANNOTATIONS = f"{d}/GT/all_annotations_nominus1_nodup.csv"
+ALL_GT_ANNOTATIONS = f"{d}/GT/all_annotations_raw_noDiscard.csv"
 LABEL_MAP = f"{d}/GT/hpa_single_cell_label_map.pbtxt"
 INPUT_PREDICTIONS = os.path.join(d, args.folder, file)
 OUTPUT_METRICS = os.path.join(

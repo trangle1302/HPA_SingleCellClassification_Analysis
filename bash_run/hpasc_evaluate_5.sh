@@ -1,7 +1,7 @@
-ALL_GT_ANNOTATIONS=/home/trangle/HPA_SingleCellClassification/GT/all_annotations_publictest.csv
+ALL_GT_ANNOTATIONS=/home/trangle/HPA_SingleCellClassification/GT/all_annotations_nominus1_nodup.csv
 LABEL_MAP=/home/trangle/HPA_SingleCellClassification/GT/hpa_single_cell_label_map.pbtxt
 INPUT_PREDICTIONS=/home/trangle/HPA_SingleCellClassification/predictions/5th/final_submission_narsil_10052021.csv
-OUTPUT_METRICS=/home/trangle/HPA_SingleCellClassification/predictions/5th/final_submission_narsil_10052021_outputmetrics_public.csv
+OUTPUT_METRICS=/home/trangle/HPA_SingleCellClassification/predictions/5th/final_submission_narsil_10052021_outputmetrics.csv
 
 python models/research/object_detection/metrics/oid_hpasc_challenge_evaluation.py \
     --all_annotations=${ALL_GT_ANNOTATIONS} \
