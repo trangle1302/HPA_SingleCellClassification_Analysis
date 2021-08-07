@@ -105,23 +105,6 @@ def main(unused_argv):
   flags.mark_flag_as_required('output_metrics')
 
   is_instance_segmentation_eval = False
-  """
-  all_location_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-bbox_expanded.csv")
-  all_label_annotations = pd.read_csv("/home/trangle/HPA_SingleCellClassification/predictions/OID/challenge-2019-validation-segmentation-labels_expanded.csv")
-  all_label_annotations.rename(
-      columns={'Confidence': 'ConfidenceImageLabel'}, inplace=True)
-
-  if False: #FLAGS.input_annotations_segm:
-    is_instance_segmentation_eval = True
-    all_segm_annotations = pd.read_csv(FLAGS.input_annotations_segm)
-    # Note: this part is unstable as it requires the float point numbers in both
-    # csvs are exactly the same;
-    # Will be replaced by more stable solution: merge on LabelName and ImageID
-    # and filter down by IoU.
-    all_location_annotations = utils.merge_boxes_and_masks(
-        all_location_annotations, all_segm_annotations)
-  all_annotations = pd.concat([all_location_annotations, all_label_annotations])
-  """ 
   
   if False: #Formatting the solution files, only need to be done once!!
       all_annotations_hpa = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/_solution.csv_")
@@ -137,21 +120,6 @@ def main(unused_argv):
               if pred_string[k+6] == '-1':
                 continue
               line = f"{row.ID},{row.ImageWidth},{row.ImageHeight},1,{pred_string[k]},{boxes[1]},{boxes[0]},{boxes[3]},{boxes[2]},{pred_string[k+5]},{pred_string[k+6]}\n"
-              '''
-              line = {
-                      "ImageID":row.ID,
-                      "ImageWidth":row.ImageWidth,
-                      "ImageHeight":row.ImageHeight,
-                      "ConfidenceImageLabel": 1, 
-                      "LabelName": pred_string[k], 
-                      "XMin":boxes[1],
-                      "YMin":boxes[0],
-                      "XMax":boxes[3],
-                      "YMax":boxes[2],
-                      "IsGroupOf":pred_string[k+5],
-                      "Mask": pred_string[k+6]
-                }
-              '''
               print(line)
               f.write(line)
       f.close()
@@ -164,7 +132,6 @@ def main(unused_argv):
   # all_annotations = all_annotations[all_annotations.ImageID.isin(imlist)]
 
   class_label_map, categories = _load_labelmap(FLAGS.input_class_labelmap)
-  #class_label_map, categories = _load_labelmap("/home/trangle/HPA_SingleCellClassification/models/research/object_detection/data/oid_object_detection_challenge_500_label_map.pbtxt")
   challenge_evaluator = (
       object_detection_evaluation.OpenImagesChallengeEvaluator(
           categories, evaluate_masks=is_instance_segmentation_eval, matching_iou_threshold=0.6))
@@ -195,7 +162,6 @@ def main(unused_argv):
   for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
     #if images_processed == 20:
     #  pass
-    #logging.info('Processing image %d', images_processed)
     image_id, image_groundtruth = groundtruth
     groundtruth_dictionary = utils.build_groundtruth_dictionary(
         image_groundtruth, class_label_map)
