@@ -105,7 +105,7 @@ def main(unused_argv):
   flags.mark_flag_as_required('output_metrics')
 
   is_instance_segmentation_eval = False
-  
+  resume = True
   if False: #Formatting the solution files, only need to be done once!!
       all_annotations_hpa = pd.read_csv("/home/trangle/HPA_SingleCellClassification/GT/_solution.csv_")
       f = open(FLAGS.all_annotations, "a+")
@@ -135,7 +135,18 @@ def main(unused_argv):
   challenge_evaluator = (
       object_detection_evaluation.OpenImagesChallengeEvaluator(
           categories, evaluate_masks=is_instance_segmentation_eval, matching_iou_threshold=0.6))
- 
+  if resume:
+    if os.path.exists(os.path.join(os.path.dirname(FLAGS.output_metrics), 'obj', 'internal_state.pkl')):
+      current_state = io_utils.load_obj(os.path.dirname(FLAGS.output_metrics), 'internal_state')
+      challenge_evaluator._evaluation.merge_internal_state(current_state)
+      images_processed = io_utils.load_obj(os.path.dirname(FLAGS.output_metrics), 'images_processed')
+      print(current_state)
+    else:
+      print('no internal state file, start from scratch')
+      images_processed = []
+  else:
+    images_processed = []
+
   if not os.path.exists(FLAGS.input_predictions.replace(".csv","_formatted.csv")):
     submissions = pd.read_csv(FLAGS.input_predictions)      
     # Testing with 10 images
@@ -158,10 +169,10 @@ def main(unused_argv):
   #pr.enable()
   all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
   all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
-  images_processed = 0
+
   for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
-    #if images_processed == 20:
-    #  pass
+    if image_id in images_processed:
+      continue
     image_id, image_groundtruth = groundtruth
     groundtruth_dictionary = utils.build_groundtruth_dictionary(
         image_groundtruth, class_label_map)
@@ -173,7 +184,8 @@ def main(unused_argv):
         class_label_map)
     challenge_evaluator.add_single_detected_image_info(image_id,
                                                        prediction_dictionary)
-    images_processed += 1
+    io_utils.save_obj(images_processed, os.path.dirname(FLAGS.output_metrics), 'images_processed')
+    io_utils.save_obj(challenge_evaluator._evaluation.get_internal_state(), os.path.dirname(FLAGS.output_metrics), 'internal_state')
   metrics = challenge_evaluator.evaluate()
 
   with open(FLAGS.output_metrics, 'w') as fid:
