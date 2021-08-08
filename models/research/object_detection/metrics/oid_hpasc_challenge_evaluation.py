@@ -58,6 +58,7 @@ import cProfile, pstats, io
 from pstats import SortKey
 from multiprocessing import Process, Lock
 import math
+import traceback
 
 flags.DEFINE_string('all_annotations', None,
                     'File with groundtruth boxes and label annotations.')
@@ -154,6 +155,7 @@ def main(unused_argv):
     #submissions = submissions[submissions.ID.isin(all_annotations.ImageID)]
     f = open(FLAGS.input_predictions.replace(".csv","_formatted.csv"), "a+")
     f.write("ImageID,ImageWidth,ImageHeight,LabelName,Score,Mask\n")
+    print(f"{submissions.shape[0]} images predicted, formatting...")
     for i, row in tqdm.tqdm(submissions.iterrows(),total=submissions.shape[0]):
         try:
             pred_string = row.PredictionString.split(" ")
@@ -164,8 +166,13 @@ def main(unused_argv):
                   line = f"{row.ID},{row.ImageWidth},{row.ImageHeight},{str(label)},{conf},{rle}\n"
                   # print(line)
                   f.write(line)
-        except:
-            continue
+        except Exception as e:
+          e = sys.exc_info()
+          print('Error Return Type: ', type(e))
+          print('Error Class: ', e[0])
+          print('Error Message: ', e[1])
+          print('Error Traceback: ', traceback.format_tb(e[2]))
+          continue
 
   #pr = cProfile.Profile()
   #pr.enable()
