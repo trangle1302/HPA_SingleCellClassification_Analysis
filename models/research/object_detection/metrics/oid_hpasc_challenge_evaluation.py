@@ -57,6 +57,7 @@ import os
 import cProfile, pstats, io
 from pstats import SortKey
 from multiprocessing import Process, Lock
+import math
 
 flags.DEFINE_string('all_annotations', None,
                     'File with groundtruth boxes and label annotations.')
@@ -161,6 +162,7 @@ def main(unused_argv):
                   conf = pred_string[k + 1]
                   rle = pred_string[k + 2]
                   line = f"{row.ID},{row.ImageWidth},{row.ImageHeight},{str(label)},{conf},{rle}\n"
+                  # print(line)
                   f.write(line)
         except:
             continue
@@ -168,7 +170,9 @@ def main(unused_argv):
   #pr = cProfile.Profile()
   #pr.enable()
   all_predictions= pd.read_csv(FLAGS.input_predictions.replace(".csv","_formatted.csv"))
-  all_predictions['LabelName'] = [str(l) for l in all_predictions.LabelName]
+  all_annotations['LabelName'] = all_annotations['LabelName'].astype(int)
+  print(all_predictions.LabelName.value_counts())
+  all_predictions['LabelName'] = [str(int(l)) for l in all_predictions.LabelName]
 
   for _, groundtruth in tqdm.tqdm(enumerate(all_annotations.groupby('ImageID')), total=all_annotations.ImageID.nunique()):
     image_id, image_groundtruth = groundtruth
