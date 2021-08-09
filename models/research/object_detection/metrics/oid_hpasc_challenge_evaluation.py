@@ -59,6 +59,7 @@ from pstats import SortKey
 from multiprocessing import Process, Lock
 import math
 import traceback
+import gc
 
 flags.DEFINE_string('all_annotations', None,
                     'File with groundtruth boxes and label annotations.')
@@ -142,7 +143,7 @@ def main(unused_argv):
       current_state = io_utils.load_obj(os.path.dirname(FLAGS.output_metrics), 'internal_state')
       challenge_evaluator._evaluation.merge_internal_state(current_state)
       images_processed = io_utils.load_obj(os.path.dirname(FLAGS.output_metrics), 'images_processed')
-      print(current_state)
+      print(current_state.num_gt_instances_per_class)
     else:
       print('no internal state file, start from scratch')
       images_processed = []
@@ -197,6 +198,7 @@ def main(unused_argv):
                                                        prediction_dictionary)
     io_utils.save_obj(images_processed, os.path.dirname(FLAGS.output_metrics), 'images_processed')
     io_utils.save_obj(challenge_evaluator._evaluation.get_internal_state(), os.path.dirname(FLAGS.output_metrics), 'internal_state')
+    gc.collect()
   metrics = challenge_evaluator.evaluate()
 
   with open(FLAGS.output_metrics, 'w') as fid:
