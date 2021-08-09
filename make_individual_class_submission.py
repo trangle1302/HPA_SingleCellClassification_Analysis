@@ -30,10 +30,10 @@ submissions = pd.read_csv(args.file)
 classes = np.arange(0, 19)
 
 for c in classes:
-    if os.path.exists(args.file.replace(".csv", f"_{c}.csv")):
+    if os.path.exists(args.file.replace(".csv", f"_class_{c}.csv")):
         print("removing existing class submission file....")
-        os.remove(args.file.replace(".csv", f"_{c}.csv"))
-    f = open(args.file.replace(".csv", f"_{c}.csv"), "a+")
+        os.remove(args.file.replace(".csv", f"_class_{c}.csv"))
+    f = open(args.file.replace(".csv", f"_class_{c}.csv"), "a+")
     f.write("ID,ImageWidth,ImageHeight,PredictionString\n")
     print(f"{submissions.shape[0]} images predicted, formatting for class {c}...")
     for i, row in tqdm.tqdm(submissions.iterrows(), total=submissions.shape[0]):
