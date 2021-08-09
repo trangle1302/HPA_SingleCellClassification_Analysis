@@ -31,11 +31,11 @@ submissions = pd.read_csv(args.file)
 classes = np.arange(0, 19)
 
 for c in classes:
-    if os.path.exists(args.file.replace(".csv", f"_class_{c}.csv")):
+    if os.path.exists(os.path.join(d, f"{name}_class_{c}.csv")):
         print("removing existing class submission file....")
-        os.remove(args.file.replace(".csv", f"_class_{c}.csv"))
+        os.remove(os.path.join(d, f"{name}_class_{c}.csv"))
     f = open(os.path.join(d, f"{name}_class_{c}.csv"), "a+")
-    #f = open(args.file.replace(".csv", f"_class_{c}.csv"), "a+")
+    # f = open(args.file.replace(".csv", f"_class_{c}.csv"), "a+")
     f.write("ID,ImageWidth,ImageHeight,PredictionString\n")
     print(f"formatting submission for class {c} to {name}_class_{c}.csv")
     for i, row in tqdm.tqdm(submissions.iterrows(), total=submissions.shape[0]):
