@@ -29,7 +29,7 @@ def _load_labelmap(labelmap_path):
   return labelmap_dict, categories
 
 
-d = "/home/trangle/HPA_SingleCellClassification/predictions"
+d = "/data/kaggle-dataset/mAPscoring"
 plot_dir = "/home/trangle/HPA_SingleCellClassification/plots"
 mapping = "/home/trangle/HPA_SingleCellClassification/GT/hpa_single_cell_label_map.pbtxt"
 class_label_map, categories = _load_labelmap(FLAGS.input_class_labelmap)
