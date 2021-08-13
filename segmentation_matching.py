@@ -57,7 +57,7 @@ def __main__(args, process_num=10):
     p.close()
     p.join()
     print(f"All subprocesses done. {time.time()-s} sec")
-
+    print(f"Finished in {(time.time() - s)/3600} h")
     merge_df(save_dir, meta)
 
 
@@ -69,6 +69,8 @@ def run_proc(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
 
 def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
     results = pd.DataFrame()
+    f = open(os.path.join(save_dir, f"IOU_part_{pid}.csv"), "a+")  
+    f.write("Image,Cell_ID,GT_cell_label,Predicted_cell_label,IOU\n")
     for i, row in tqdm(pred_df[sp:ep].iterrows(), postfix=pid):
         image_id = row.ID
         gt_masks = imread(os.path.join(gt_mask_dir, image_id + "_mask.png"))
@@ -110,6 +112,9 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                 iou = iou_coords(p_coords, gt_coords)
                 if iou > 0.6:
                     matched_ids.add(cell_idx)
+                    gt_lab = gt_labels_1image[gt_labels_1image.Cell_ID == str(cell_idx)].Label.values
+                    line = f"{image_id},{cell_idx},{gt_lab},{preds[rle]},{iou}\n"
+                    """
                     result = {
                         "Image": image_id,
                         "Cell_ID": cell_idx,
@@ -122,10 +127,14 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                     # print(result)
                     results = results.append(result, ignore_index=True)
                     # print(f"Matching 1 cell takes {time.time() - s} sec")
+                    """
+                    f.write(line)
                     found = True
                     continue
 
             if found:
+                line = f"{image_id},{None},{None},{preds[rle]},{0}\n"
+                """
                 result = {
                     "Image": image_id,
                     "Cell_ID": None,
@@ -134,10 +143,15 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                     "IOU": 0,
                 }
                 results = results.append(result, ignore_index=True)
+                """
+                f.write(line)
 
         cells_left = cell_idxes - matched_ids
         if len(cells_left) > 0:
             for cell_idx in cells_left:
+                gt_lab = gt_labels_1image[gt_labels_1image.Cell_ID == str(cell_idx)].Label.values
+                line = f"{image_id},{cell_idx},{gt_lab},{None},{0}\n"
+                """
                 result = {
                     "Image": image_id,
                     "Cell_ID": cell_idx,
@@ -148,9 +162,12 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                     "IOU": 0,
                 }
                 results = results.append(result, ignore_index=True)
+                """
+                f.write(line)
 
-    results.to_csv(os.path.join(save_dir, f"IOU_part_{pid}.csv"))
+    #results.to_csv(os.path.join(save_dir, f"IOU_part_{pid}.csv"))
 
+    f.close()
 
 def merge_df(d, meta):
     files = [f for f in os.listdir(d) if f.startswith("IOU_part_")]
