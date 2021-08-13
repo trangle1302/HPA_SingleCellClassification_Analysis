@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description="Creating bash script")
 parser.add_argument("-file", type=str, help="path to submission file")
 args = parser.parse_args()
 
+
 def __main__(args, process_num=10):
     gt_mask_dir = "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/data"
     gt_labels = pd.read_csv(
@@ -31,8 +32,10 @@ def __main__(args, process_num=10):
     pred_mask_path = args.file
     pred = pd.read_csv(pred_mask_path)
     pred = pred[pred.ID.isin(gt_labels.Image_ID)]
-    meta = pd.read_csv("/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv")
-    
+    meta = pd.read_csv(
+        "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv"
+    )
+
     s = time.time()
     os.makedirs(save_dir, exist_ok=True)
     print("Parent process %s." % os.getpid())
@@ -54,7 +57,7 @@ def __main__(args, process_num=10):
     p.close()
     p.join()
     print(f"All subprocesses done. {time.time()-s} sec")
-    
+
     merge_df(save_dir, meta)
 
 
