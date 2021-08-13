@@ -10,25 +10,29 @@ from tqdm import tqdm
 from imageio import imread
 from skimage.measure import regionprops
 import time
+import argparse
 
+parser = argparse.ArgumentParser(description="Creating bash script")
+parser.add_argument("-file", type=str, help="path to submission file")
+args = parser.parse_args()
 
-def __main__(process_num=10):
-    gt_mask_dir = "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/publictest"
+def __main__(args, process_num=10):
+    gt_mask_dir = "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/data"
     gt_labels = pd.read_csv(
-        "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/publictest/labels_publictest.csv"
+        "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv"
     )
     gt_labels["Image_ID"] = [f.split("_")[0] for f in gt_labels.ID]
     gt_labels["Cell_ID"] = [f.split("_")[1] for f in gt_labels.ID]
     print(f"GT labels have {len(gt_labels)} cells")
     # gt_mask_dir = "W:\home\trangle\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\data"
     # gt_labels = pd.read_csv("W:\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\labels.csv")
-    save_dir = "/home/trangle/HPA_SingleCellClassification/predictions/bestfitting"
+    save_dir = os.path.dirname(args.file)
     # pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
-    pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/bestfitting/en_m6_2image_4cell_0508_complet_v14.csv"
+    pred_mask_path = args.file
     pred = pd.read_csv(pred_mask_path)
     pred = pred[pred.ID.isin(gt_labels.Image_ID)]
     meta = pd.read_csv("/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv")
-    """
+    
     s = time.time()
     os.makedirs(save_dir, exist_ok=True)
     print("Parent process %s." % os.getpid())
@@ -50,7 +54,7 @@ def __main__(process_num=10):
     p.close()
     p.join()
     print(f"All subprocesses done. {time.time()-s} sec")
-    """
+    
     merge_df(save_dir, meta)
 
 
@@ -142,7 +146,7 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                 }
                 results = results.append(result, ignore_index=True)
 
-    results.to_csv(os.path.join(save_dir, f"{pid}.csv"))
+    results.to_csv(os.path.join(save_dir, f"IOU_{pid}.csv"))
 
 
 def merge_df(d, meta):
@@ -152,7 +156,7 @@ def merge_df(d, meta):
         df_ = pd.read_csv(os.path.join(d, f))
         df = df.append(df_, ignore_index=True)
     df_merged = df.merge(meta, right_on="Image_ID", left_on="Image")
-    df_merged.to_csv(os.path.join(d, f"merged.csv"))
+    df_merged.to_csv(os.path.join(d, f"IOU_merged.csv"))
     df_ = df_merged[df_merged["GT cell label"] != None]
     # print(df_.columns)
     # print(f"matched {sum(df_.Cell_ID.isna()==False)}/{len(df_)} cells")
@@ -161,4 +165,4 @@ def merge_df(d, meta):
 
 
 if __name__ == "__main__":
-    __main__()
+    __main__(args)
