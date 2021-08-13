@@ -146,11 +146,12 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                 }
                 results = results.append(result, ignore_index=True)
 
-    results.to_csv(os.path.join(save_dir, f"IOU_{pid}.csv"))
+    results.to_csv(os.path.join(save_dir, f"IOU_part_{pid}.csv"))
 
 
 def merge_df(d, meta):
-    files = [f for f in os.listdir(d) if not f.endswith("_submission.csv")]
+    files = [f for f in os.listdir(d) if f.startswith("IOU_part_")]
+    print(files)
     df = pd.DataFrame()
     for f in files:
         df_ = pd.read_csv(os.path.join(d, f))
