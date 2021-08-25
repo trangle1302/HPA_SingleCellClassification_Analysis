@@ -16,7 +16,7 @@ def find_coords(propslist, cell_label):
         if prop.label == cell_label:
             return prop.coords
     else:
-        print(cell_label, "Not found")
+        print(cell_label, "Cell Label Not found")
         return None
 
 
