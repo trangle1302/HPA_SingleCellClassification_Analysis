@@ -139,7 +139,7 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                     found = True
                     continue
 
-            if found:
+            if not found:
                 line = f"{image_id};{None};{None};{preds[rle]};{0}\n"
                 """
                 result = {
