@@ -24,13 +24,14 @@ def __main__(args, process_num=10):
     )
     gt_labels["Image_ID"] = [f.split("_")[0] for f in gt_labels.ID]
     gt_labels["Cell_ID"] = [f.split("_")[1] for f in gt_labels.ID]
-    print(f"GT labels have {len(gt_labels)} cells")
+    print(f"GT labels have {len(gt_labels)} cells, including {gt_labels.Label.value_counts()['Discard']} Discard")
     # gt_mask_dir = "W:\home\trangle\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\data"
     # gt_labels = pd.read_csv("W:\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\labels.csv")
     save_dir = os.path.dirname(args.file)
     # pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
     pred_mask_path = args.file
     pred = pd.read_csv(pred_mask_path)
+    print("Prediction files have ", len(pred), "lines")
     pred = pred[pred.ID.isin(gt_labels.Image_ID)]
     meta = pd.read_csv(
         "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv"
@@ -57,7 +58,7 @@ def __main__(args, process_num=10):
     print("Waiting for all subprocesses done...")
     p.close()
     p.join()
-    print(f"All subprocesses done. {(time.time()-s)/3600} h")i
+    print(f"All subprocesses done. {(time.time()-s)/3600} h")
     
     merge_df(save_dir, meta)
 
@@ -70,7 +71,7 @@ def run_proc(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
 
 def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
     results = pd.DataFrame()
-    f = open(os.path.join(save_dir, f"IOU_part_{pid}.csv"), "a+")  
+    f = open(os.path.join(save_dir, f"IOU_p_{pid}.csv"), "a+")  
     f.write("Image;Cell_ID;GT_cell_label;Predicted_cell_label;IOU\n")
     for i, row in tqdm(pred_df[sp:ep].iterrows(), postfix=pid):
         image_id = row.ID
@@ -83,15 +84,20 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
         width = row.ImageWidth
         height = row.ImageHeight
         pred_string = row.PredictionString.split(" ")
+        if len(pred_string)%3 == 1:
+            pred_string = pred_string[:-1]
+        #print(f"{image_id} has {len(pred_string)/3} predictions")
         preds = dict()
         for k in range(0, len(pred_string), 3):
             label = pred_string[k]
             conf = pred_string[k + 1]
             rle = pred_string[k + 2]
+            #print(label, conf, rle[-5:])
             if rle not in preds.keys():
                 preds[rle] = dict()
             preds[rle].update({label: conf})
-
+            #print(preds[rle])
+        #print(f"Make into pred dict {len(preds)} predictions")
         """
         print(f'Number of cells predicted: {len(preds)}')
         print(f'Number of cells in groundtruth: {len(cell_idxes)} masks, {len(gt_labels_1image)} lab')
@@ -166,27 +172,34 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                 """
                 f.write(line)
 
-    #results.to_csv(os.path.join(save_dir, f"IOU_part_{pid}.csv"))
-
     f.close()
 
 def merge_df(d, meta):
-    files = [f for f in os.listdir(d) if f.startswith("IOU_part_")]
-    # print(files)
+    files = [f for f in os.listdir(d) if f.startswith("IOU_p_")]
+    print(d)
+
     df = pd.DataFrame()
     for f in files:
         #print(os.path.join(d,f))
         df_ = pd.read_csv(os.path.join(d, f), sep=";")
+        dup = df_.duplicated()
+        if sum(dup)>0:
+            print(f"Found {sum(dup)} duplicates in {f}")
+            df_ = df_[~df_.duplicated()]
+            df_ = df_[df_.Image!="Image"]
         # print(df_.columns)
         df = df.append(df_, ignore_index=True)
     df_merged = df.merge(meta, right_on="Image_ID", left_on="Image")
-    df_merged.to_csv(os.path.join(d, f"IOU_merged.csv"))
+    print(f"Saving merged files to {d}/IOU_merged.csv")
+    df_merged.to_csv(os.path.join(d, f"IOU_merged.csv"), index=False)
     df_ = df_merged[~df_merged.GT_cell_label.isna()]
+    df_ = df_[df_.GT_cell_label!="None"]
     # print(df.head(), meta.head())
     # print(df_.columns)
     # print(f"matched {sum(df_.Cell_ID.isna()==False)}/{len(df_)} cells")
+    df_.IOU = [float(x) for x in df_.IOU]
     df_ = df_.groupby(["Image", "Cell_ID"])
-    print(f"Mean IOU: {df_.IOU.mean().values.mean()}, {len(df_)} cells")
+    print(f"Mean IOU for {os.path.basename(d)}: {df_.IOU.mean().values.mean()}, {len(df_)} cells")
 
 
 if __name__ == "__main__":
