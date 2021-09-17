@@ -17,7 +17,7 @@ parser.add_argument("-file", type=str, help="path to submission file")
 args = parser.parse_args()
 
 
-def __main__(args, process_num=10):
+def __main__(args, process_num=8):
     gt_mask_dir = "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/data"
     gt_labels = pd.read_csv(
         "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv"
@@ -36,9 +36,19 @@ def __main__(args, process_num=10):
     meta = pd.read_csv(
         "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv"
     )
-
+    
+    #print(f"Images predicted = Images GT {set(gt_labels.Image_ID) == set(pred.ID)}")
+    if os.path.exists(os.path.join(save_dir, f"IOU_p_merged.csv")):
+        print(f"Found IOU_p_merged.csv, loading...")
+        df = pd.read_csv(os.path.join(save_dir, f"IOU_p_merged.csv"))
+        diff = set(gt_labels.Image_ID) - set(df.Image)
+        if len(diff)>0:
+            print(f"Missing {len(diff)} images, matching them...")
+            pred_df = pred[pred.ID.isin(diff)]
+            cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, 11, 0, len(pred_df))
     s = time.time()
     
+    """
     os.makedirs(save_dir, exist_ok=True)
     print("Parent process %s." % os.getpid())
     p = Pool(process_num)
@@ -59,7 +69,7 @@ def __main__(args, process_num=10):
     p.close()
     p.join()
     print(f"All subprocesses done. {(time.time()-s)/3600} h")
-    
+    """
     merge_df(save_dir, meta)
 
 
@@ -78,7 +88,9 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
         gt_masks = imread(os.path.join(gt_mask_dir, image_id + "_mask.png"))
         cell_idxes = set(np.unique(gt_masks)).difference([0])
         gt_labels_1image = gt_labels[gt_labels.Image_ID == image_id]
-
+        #print("have labels but no mask: ",set(gt_labels_1image.Cell_ID).difference(set([str(num) for num in cell_idxes])))
+        gt_labels_1image = gt_labels_1image[gt_labels_1image.Cell_ID.isin(set([str(num) for num in cell_idxes]))]
+        #print("have mask but no label: ",set([str(num) for num in cell_idxes]).difference(set(gt_labels_1image.Cell_ID)))
         assert set(gt_labels_1image.Cell_ID) == set([str(num) for num in cell_idxes])
         # Formating single cell's predictions
         width = row.ImageWidth
@@ -152,7 +164,7 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
                 results = results.append(result, ignore_index=True)
                 """
                 f.write(line)
-
+            #print(cell_idx, matched_ids)
         cells_left = cell_idxes - matched_ids
         if len(cells_left) > 0:
             for cell_idx in cells_left:
@@ -176,12 +188,12 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
 
 def merge_df(d, meta):
     files = [f for f in os.listdir(d) if f.startswith("IOU_p_")]
-    print(d)
+    print(d, len(files))
 
     df = pd.DataFrame()
     for f in files:
-        #print(os.path.join(d,f))
         df_ = pd.read_csv(os.path.join(d, f), sep=";")
+        #print(os.path.join(d,f), len(set(df_.Image)), "images")
         dup = df_.duplicated()
         if sum(dup)>0:
             print(f"Found {sum(dup)} duplicates in {f}")
@@ -190,14 +202,15 @@ def merge_df(d, meta):
         # print(df_.columns)
         df = df.append(df_, ignore_index=True)
     df_merged = df.merge(meta, right_on="Image_ID", left_on="Image")
-    print(f"Saving merged files to {d}/IOU_merged.csv")
-    df_merged.to_csv(os.path.join(d, f"IOU_merged.csv"), index=False)
+    print(f"Saving merged files to {d}/IOU_p_merged.csv")
+    df_merged.to_csv(os.path.join(d, f"IOU_p_merged.csv"), index=False)
     df_ = df_merged[~df_merged.GT_cell_label.isna()]
     df_ = df_[df_.GT_cell_label!="None"]
     # print(df.head(), meta.head())
     # print(df_.columns)
     # print(f"matched {sum(df_.Cell_ID.isna()==False)}/{len(df_)} cells")
     df_.IOU = [float(x) for x in df_.IOU]
+    print(f"Predicted {sum(df_.IOU>0)}/{len(df_)} cells in {len(set(df_.Image))}/{len(set(meta.Image_ID))} unique images,")
     df_ = df_.groupby(["Image", "Cell_ID"])
     print(f"Mean IOU for {os.path.basename(d)}: {df_.IOU.mean().values.mean()}, {len(df_)} cells")
 
