@@ -24,11 +24,8 @@ def __main__(args, process_num=8):
     )
     gt_labels["Image_ID"] = [f.split("_")[0] for f in gt_labels.ID]
     gt_labels["Cell_ID"] = [f.split("_")[1] for f in gt_labels.ID]
-    print(f"GT labels have {len(gt_labels)} cells, including {gt_labels.Label.value_counts()['Discard']} Discard")
-    # gt_mask_dir = "W:\home\trangle\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\data"
-    # gt_labels = pd.read_csv("W:\Desktop\annotation-tool\HPA-Challenge-2020-all\data_for_Kaggle\labels.csv")
+    #print(f"GT labels have {len(gt_labels)} cells, including {gt_labels.Label.value_counts()['Discard']} Discard")
     save_dir = os.path.dirname(args.file)
-    # pred_mask_path = "/home/trangle/HPA_SingleCellClassification/predictions/redai/redai_submission.csv"
     pred_mask_path = args.file
     pred = pd.read_csv(pred_mask_path)
     print("Prediction files have ", len(pred), "lines")
@@ -37,39 +34,38 @@ def __main__(args, process_num=8):
         "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv"
     )
     
+    s = time.time()
     #print(f"Images predicted = Images GT {set(gt_labels.Image_ID) == set(pred.ID)}")
-    if os.path.exists(os.path.join(save_dir, f"IOU_p_merged.csv")):
+    if os.path.exists(os.path.join(save_dir, "IOU_p_merged.csv")):
         print(f"Found IOU_p_merged.csv, loading...")
-        df = pd.read_csv(os.path.join(save_dir, f"IOU_p_merged.csv"))
+        df = pd.read_csv(os.path.join(save_dir, "IOU_p_merged.csv"))
         diff = set(gt_labels.Image_ID) - set(df.Image)
         if len(diff)>0:
             print(f"Missing {len(diff)} images, matching them...")
             pred_df = pred[pred.ID.isin(diff)]
             cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, 11, 0, len(pred_df))
-    s = time.time()
-    
-    """
-    os.makedirs(save_dir, exist_ok=True)
-    print("Parent process %s." % os.getpid())
-    p = Pool(process_num)
-    for i in range(process_num):
-        p.apply_async(
-            run_proc,
-            args=(
-                pred,
-                gt_mask_dir,
-                gt_labels,
-                save_dir,
-                str(i),
-                int(i * len(pred) / process_num),
-                int((i + 1) * len(pred) / process_num),
-            ),
-        )
-    print("Waiting for all subprocesses done...")
-    p.close()
-    p.join()
-    print(f"All subprocesses done. {(time.time()-s)/3600} h")
-    """
+    else:
+        os.makedirs(save_dir, exist_ok=True)
+        print("Parent process %s." % os.getpid())
+        p = Pool(process_num)
+        for i in range(process_num):
+            p.apply_async(
+                run_proc,
+                args=(
+                    pred,
+                    gt_mask_dir,
+                    gt_labels,
+                    save_dir,
+                    str(i),
+                    int(i * len(pred) / process_num),
+                    int((i + 1) * len(pred) / process_num),
+                ),
+            )
+        print("Waiting for all subprocesses done...")
+        p.close()
+        p.join()
+        print(f"All subprocesses done. {(time.time()-s)/3600} h")
+
     merge_df(save_dir, meta)
 
 
@@ -95,12 +91,17 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
         # Formating single cell's predictions
         width = row.ImageWidth
         height = row.ImageHeight
-        pred_string = row.PredictionString.split(" ")
+        pred_string = row.PredictionString.split() # split() without arguments split on whitespace
+        """
         if len(pred_string)%3 == 1:
             pred_string = pred_string[:-1]
-        #print(f"{image_id} has {len(pred_string)/3} predictions")
+        if len(pred_string)%3 ==2:
+            pred_string = pred_string[:-2]
+        """
+        print(f"{image_id} has {len(pred_string)/3} predictions")
         preds = dict()
         for k in range(0, len(pred_string), 3):
+            #print(pred_string[k], pred_string[k+1], pred_string[k+2][-5:])
             label = pred_string[k]
             conf = pred_string[k + 1]
             rle = pred_string[k + 2]
@@ -188,7 +189,8 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
 
 def merge_df(d, meta):
     files = [f for f in os.listdir(d) if f.startswith("IOU_p_")]
-    print(d, len(files))
+    files = [f for f in files if f != "IOU_p_merged.csv"]
+    #print(d, len(files))
 
     df = pd.DataFrame()
     for f in files:
@@ -203,14 +205,14 @@ def merge_df(d, meta):
         df = df.append(df_, ignore_index=True)
     df_merged = df.merge(meta, right_on="Image_ID", left_on="Image")
     print(f"Saving merged files to {d}/IOU_p_merged.csv")
-    df_merged.to_csv(os.path.join(d, f"IOU_p_merged.csv"), index=False)
+    df_merged.to_csv(os.path.join(d, "IOU_p_merged.csv"), index=False)
     df_ = df_merged[~df_merged.GT_cell_label.isna()]
     df_ = df_[df_.GT_cell_label!="None"]
     # print(df.head(), meta.head())
     # print(df_.columns)
     # print(f"matched {sum(df_.Cell_ID.isna()==False)}/{len(df_)} cells")
     df_.IOU = [float(x) for x in df_.IOU]
-    print(f"Predicted {sum(df_.IOU>0)}/{len(df_)} cells in {len(set(df_.Image))}/{len(set(meta.Image_ID))} unique images,")
+    print(f"Predicted {sum(df_.IOU>0)}/{len(df_)} GT cells plus extra {len(df_merged) - len(df_)} in {len(set(df_.Image))}/{len(set(meta.Image_ID))} unique images,")
     df_ = df_.groupby(["Image", "Cell_ID"])
     print(f"Mean IOU for {os.path.basename(d)}: {df_.IOU.mean().values.mean()}, {len(df_)} cells")
 
