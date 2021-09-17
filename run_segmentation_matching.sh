@@ -1,8 +1,9 @@
 python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/bestfitting/en_m6_2image_4cell_0508_complet_v14.csv
-python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/redai/hpa_final_submission_#2_candidate_II.csv
 python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/3rd/HPA_Ensemble_v4.9.csv
+python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/redai/hpa_final_submission_#2_candidate_II.csv
 python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/4th/HPASubmission_210272.csv
-python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/5th/final_submission_narsil_10052021.csv
+#python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/5th/final_submission_narsil_10052021.csv
+python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/5th/final_submission_13May2021_fromV20_narsil
 python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/6th/HPA_full_inference_faster_segmentation-v1.csv
 python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/7th/hpa-final-sub-weight111-f05.csv
 python segmentation_matching.py -file=/data/kaggle-dataset/mAPscoring/8th/notebook87aa51323f.csv
