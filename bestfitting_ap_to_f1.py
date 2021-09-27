@@ -35,6 +35,8 @@ def _f1_score(prediction, ground_truth):
   precision = 1.0 * num_same / len(prediction_tokens)
   recall = 1.0 * num_same / len(ground_truth_tokens)
   f1 = (2 * precision * recall) / (precision + recall)
+  
+  print(prediction_tokens, ground_truth_tokens, f1)
   return f1
 
 def conf_to_label(pred_str, conf_threshold = 0.5):
@@ -56,7 +58,7 @@ if __name__ == "__main__":
         pred_str = row.Predicted_cell_label
         #print(pred_str)
         if pred_str != 'None':
-            formatted_str = conf_to_label(pred_str, conf_threshold=0.2)
+            formatted_str = conf_to_label(pred_str, conf_threshold=0.3)
             if formatted_str != None:
                 bestfitting_match.loc[i,"Predicted_cell_label_formatted"] = formatted_str
     
