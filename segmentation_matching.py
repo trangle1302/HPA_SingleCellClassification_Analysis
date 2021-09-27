@@ -98,7 +98,7 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
         if len(pred_string)%3 ==2:
             pred_string = pred_string[:-2]
         """
-        print(f"{image_id} has {len(pred_string)/3} predictions")
+        #print(f"{image_id} has {len(pred_string)/3} predictions")
         preds = dict()
         for k in range(0, len(pred_string), 3):
             #print(pred_string[k], pred_string[k+1], pred_string[k+2][-5:])
