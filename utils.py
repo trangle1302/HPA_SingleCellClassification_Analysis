@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import glob
-from imageio import imread
+from imageio import imread, imwrite
 from skimage.measure import regionprops
 from collections import namedtuple
 import pandas as pd
@@ -9,7 +9,7 @@ import base64
 import zlib
 from pycocotools import _mask as coco_mask
 import time
-
+import io
 
 def find_coords(propslist, cell_label):
     for prop in propslist:
@@ -112,3 +112,49 @@ def decodeToBinaryMask(rleCodedStr, imWidth, imHeight):
     binaryMask = mask.astype("uint8")[:, :, 0]
     # print(f'Decoding 1 cell: {time.time() - s} sec') #Avg 0.0035 sec for each cell
     return binaryMask
+
+
+def to_uint8(img):
+    if img.dtype == np.dtype(np.uint16):
+        img = np.clip(img, 0, 65535)
+        img = (img / 65535 * 255.0).astype(np.uint8)
+    elif img.dtype == np.dtype(np.float32) or img.dtype == np.dtype(np.float64):
+        img = (img * 255).round().astype(np.uint8)
+    elif img.dtype != np.dtype(np.uint8):
+        raise Exception("Invalid image dtype " + img.dtype)
+    return img
+
+def normalize(x):
+    return (x - x.min()) / (x.max() - x.min())
+
+def read_rgb(img_path, encoding=None):
+    try:
+        try:
+            blue = imread(img_path + "_blue.png")
+            yellow = imread(img_path + "_yellow.png")
+            red = imread(img_path + "_red.png")
+        except:
+            blue = imread(os.path.join(img_path, "nuclei.png"))
+            yellow = imread(os.path.join(img_path, "yellow.png"))
+            red = imread(os.path.join(img_path, "microtubules.png"))
+        red = np.clip(normalize(red) + normalize(yellow), 0, 1)
+        green = normalize(yellow)
+        img = np.dstack((to_uint8(red), to_uint8(green), to_uint8(normalize(blue))))
+
+        if encoding:
+            return encode_image_array(img, format=encoding)
+        return img
+    except:
+        raise Exception(
+            "At least one channel does not exist in " + os.path.basename(img_path)
+        )
+        
+
+def encode_image_array(img, format="PNG"):
+    in_mem_file = io.BytesIO()
+    imwrite(in_mem_file, img, format=format)
+    in_mem_file.seek(0)
+    img_bytes = in_mem_file.read()
+    return base64.b64encode(img_bytes).decode("ascii")
+
+
