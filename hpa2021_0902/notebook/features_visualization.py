@@ -186,11 +186,12 @@ def show_features(predict_valid=True, show_multi=True, title=''):
     sub_df["x"] = [idx[0] for idx in X]
     sub_df["y"] = [idx[1] for idx in X]
     sub_df["id"] = ["_".join([img,str(cell)]) for img, cell in zip(sub_df.ID, sub_df.maskid)]
-    sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
+    sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False) #/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/multi-location.csv and single-location.csv
     return sub_df
     
 #%%
-sub_df = show_features(predict_valid=False, show_multi=True, title='multi-location')
+title = 'multi-location'
+sub_df = show_features(predict_valid=False, show_multi=True, title=title)
 
 target_format = pd.read_csv("/home/trangle/Downloads/umap_results_fit_all_transform_all_sorted_20190422.csv")
 
