@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-#import imageio
+from skimage.measure import regionprops#, regionprops_table
+import imageio
 import seaborn as sns
 import utils
 
@@ -55,10 +56,12 @@ ALIAS_TO_LABEL = {str(v):k for k,v in LABEL_TO_ALIAS.items()}
 
 df = pd.read_csv(os.path.join(BASE_DIR,"result/d0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds/fold0/epoch_12.00_ema/cell_result_train_cell_v1.csv"))
 csv = pd.read_csv(os.path.join(IMAGE_DIR,"mask/train.csv"))
-
+#df = pd.merge(df,csv[['ImageHeight', 'ImageWidth']], on="'ImageHeight', 'ImageWidth'")
+metadata = pd.read_csv("/data/HPA-IF-images/IF-image.csv")
+metadata["Image_ID"] = [os.path.basename(f)[:-1] for f in metadata.filename]
 """
 for (k,v) in ALIAS_TO_LABEL.items():
-    plt.figure()
+    plt.figure()n
     plt.hist(df[k], bins=1000, alpha = 0.3)
     plt.xlabel("Class confidence score")
     plt.ylabel("Cell counts")
@@ -67,26 +70,43 @@ for (k,v) in ALIAS_TO_LABEL.items():
     plt.close()
 """
     
-THRESHOLD = 0.5
+THRESHOLD = 0.3
 
 imlist = list(set(df.ID))
-for im in imlist:  
+for im in imlist[:10]:  
   pcdf = df[df.ID==im]
   pcdf.to_csv(os.path.join(SAVE_DIR,f"predicted_cells_{im}.csv"), index=False)
   cdf = csv[csv.ID==im]
   cdf.to_csv(os.path.join(SAVE_DIR,f"train_cells_{im}.csv"), index=False)
   img = utils.read_rgb(os.path.join(IMAGE_DIR,"images","train",im))
-  cellmask = plt.imread(os.path.join(IMAGE_DIR,"mask","train",im+"_cellmask.png"))
-  nucleimask = plt.imread(os.path.join(IMAGE_DIR,"mask","train",im+"_nucleimask.png"))
-
-  fig, ax = plt.subplots(1,3)
+  cellmask = imageio.imread(os.path.join(IMAGE_DIR,"mask","train",im+"_cellmask.png"))
+  nucleimask = imageio.imread(os.path.join(IMAGE_DIR,"mask","train",im+"_nucleimask.png"))
+  props = regionprops(cellmask)
+  fig, ax = plt.subplots(1,3, figsize=(30,10))
   ax[0].imshow(img)
-  ax[1].imshow(cellmask, alpha=0.5)
-  ax[1].imshow(nucleimask, alpha=0.5)
+  ax[0].set_title("RGB",fontsize=18)
+  ax[0].axis('off')
+  ax[1].imshow(plt.imread(os.path.join(IMAGE_DIR,"images","train",im+'_green.png')))
+  ax[1].set_title("Protein channel",fontsize=18)
+  ax[1].axis('off')
+  ax[2].imshow(cellmask, alpha=1)
+  ax[2].imshow(nucleimask, alpha=0.5)
+  ax[2].set_title("Mask & Prediction",fontsize=18)
+  ax[2].axis('off')
   for i, row in pcdf.iterrows():
-    
-  print(img.shape, cellmask.shape, nucleimask.shape)
-  breakme
+      bbox = [p.bbox for p in props if p.label==row.maskid]
+      labels = [k for k in ALIAS_TO_LABEL.keys() if row[k]>THRESHOLD]
+      if ('Negative' in labels) or len(labels)==0:
+          labels = 'Negative'
+      else:
+          labels= '\n'.join(labels)   
+      x = (bbox[0][1] + bbox[0][3])/2
+      y = (bbox[0][0] + bbox[0][2])/2
+      ax[2].text(x,y+100, labels, color='white')
+  image_locations = metadata[metadata.Image_ID==im].locations.values[0]
+  fig.suptitle(f"{im} : {image_locations}", fontsize=16)
+  plt.savefig(os.path.join(SAVE_DIR,"psc",im+'.jpg'))
+
 
 
 def plot_():
