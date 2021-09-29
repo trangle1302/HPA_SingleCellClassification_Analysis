@@ -9,6 +9,8 @@ import utils
 BASE_DIR = "/home/trangle/HPA_SingleCellClassification/hpa2021_0902"
 IMAGE_DIR = "/data/kaggle-dataset/PUBLICHPA"
 SAVE_DIR = "/home/trangle/HPA_SingleCellClassification/plots"
+THRESHOLD = 0.3
+PLOT_CONF = False
 
 LABEL_TO_NAME = dict({
   0: 'Nucleoplasm',
@@ -53,36 +55,39 @@ LABEL_TO_ALIAS = dict({
   18: 'Negative',
 })
 ALIAS_TO_LABEL = {str(v):k for k,v in LABEL_TO_ALIAS.items()}
+plot_conf_hist = False
+
+
 
 df = pd.read_csv(os.path.join(BASE_DIR,"result/d0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds/fold0/epoch_12.00_ema/cell_result_train_cell_v1.csv"))
-csv = pd.read_csv(os.path.join(IMAGE_DIR,"mask/train.csv"))
+imlist = list(set(df.ID))
+#csv = pd.read_csv(os.path.join(IMAGE_DIR,"mask/train.csv"))
 #df = pd.merge(df,csv[['ImageHeight', 'ImageWidth']], on="'ImageHeight', 'ImageWidth'")
 metadata = pd.read_csv("/data/HPA-IF-images/IF-image.csv")
 metadata["Image_ID"] = [os.path.basename(f)[:-1] for f in metadata.filename]
-"""
-for (k,v) in ALIAS_TO_LABEL.items():
-    plt.figure()n
-    plt.hist(df[k], bins=1000, alpha = 0.3)
-    plt.xlabel("Class confidence score")
-    plt.ylabel("Cell counts")
-    plt.title(LABEL_TO_NAME[v])
-    plt.savefig(os.path.join(SAVE_DIR,f"confidence_by_bestfittinghpasc_for_PUBLICHPA_{k}.png"))
-    plt.close()
-"""
-    
-THRESHOLD = 0.3
+metadata = metadata[metadata.Image_ID.isin(imlist)]
 
-imlist = list(set(df.ID))
+if PLOT_CONF:
+    for (k,v) in ALIAS_TO_LABEL.items():
+        plt.figure()
+        plt.hist(df[k], bins=1000, alpha = 0.3)
+        plt.xlabel("Class confidence score")
+        plt.ylabel("Cell counts")
+        plt.title(LABEL_TO_NAME[v])
+        plt.savefig(os.path.join(SAVE_DIR,f"confidence_by_bestfittinghpasc_for_PUBLICHPA_{k}.png"))
+        plt.close()
+
+
 for im in imlist[:10]:  
   pcdf = df[df.ID==im]
   pcdf.to_csv(os.path.join(SAVE_DIR,f"predicted_cells_{im}.csv"), index=False)
-  cdf = csv[csv.ID==im]
-  cdf.to_csv(os.path.join(SAVE_DIR,f"train_cells_{im}.csv"), index=False)
+  #cdf = csv[csv.ID==im]
+  #cdf.to_csv(os.path.join(SAVE_DIR,f"train_cells_{im}.csv"), index=False)
   img = utils.read_rgb(os.path.join(IMAGE_DIR,"images","train",im))
   cellmask = imageio.imread(os.path.join(IMAGE_DIR,"mask","train",im+"_cellmask.png"))
   nucleimask = imageio.imread(os.path.join(IMAGE_DIR,"mask","train",im+"_nucleimask.png"))
-  props = regionprops(cellmask)
-  fig, ax = plt.subplots(1,3, figsize=(30,10))
+  props = regionprops(nucleimask)
+  fig, ax = plt.subplots(1,3, figsize=(30,12))
   ax[0].imshow(img)
   ax[0].set_title("RGB",fontsize=18)
   ax[0].axis('off')
@@ -104,28 +109,7 @@ for im in imlist[:10]:
       y = (bbox[0][0] + bbox[0][2])/2
       ax[2].text(x,y+100, labels, color='white')
   image_locations = metadata[metadata.Image_ID==im].locations.values[0]
-  fig.suptitle(f"{im} : {image_locations}", fontsize=16)
-  plt.savefig(os.path.join(SAVE_DIR,"psc",im+'.jpg'))
-
-
-
-def plot_():
-    fig, ax = plt.subplots(1,2, figsize=(20,10)) 
-    ax[0].imshow(img)
-    ax[0].axis('off')
-    for i, row in cdf.iterrows():
-        cell_id = int(row.cell_id.split('/')[1])
-        poly = mapping[cell_id]
-        ax[0].add_patch(PolygonPatch(poly, fc='#6699cc', ec='#6699cc', alpha=0.5, zorder=2 ))    
-        x = (poly['bbox'][0][1] + poly['bbox'][0][3])/2
-        y = (poly['bbox'][0][0] + poly['bbox'][0][2])/2
-        ax[0].text(x,y, row.labels, color='white')
-    ax[1].imshow(imread(img_path + '_green.png'))
-    ax[1].axis('off')
-    
-    plt.title('Protein channel')
-    plt.suptitle(f'{image_id}, Image annotation: {row.image_locations} \n {subtext}')   
-    #plt.tight_layout()
-    #plt.show()  
-    plt.savefig(os.path.join(DATA_DIR,'final_label_check', image_id + '.png'))
-    print(f'{image_id} done plotting')
+  cell_line = metadata[metadata.Image_ID==im].atlas_name.values[0]
+  fig.suptitle(f"{cell_line} : {im} : {image_locations}", fontsize=18,fontweight = 'bold')
+  plt.tight_layout()
+  plt.savefig(os.path.join(SAVE_DIR,"psc",im+'.jpg'), dpi=600)
