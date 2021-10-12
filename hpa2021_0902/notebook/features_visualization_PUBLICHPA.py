@@ -25,8 +25,8 @@ ope = os.path.exists
 opj = os.path.join
 
 #%%
-FEATURE_DIR    = 'hpa2021_0902/features'
-DATA_DIR       = 'hpa2021_0902/data'
+FEATURE_DIR    = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/features'
+DATA_DIR       = '/data/kaggle-dataset/PUBLICHPA'
 
 ID             = 'ID'
 LABEL          = 'Label'
@@ -100,12 +100,12 @@ COLORS = [
 
 #%%
 DATASET = 'train'
-valid_df = pd.read_csv(f'{DATA_DIR}/split/random_folds5/random_valid_cv0.csv')
-valid_df.shape
+#valid_df = pd.read_csv(f'{DATA_DIR}/split/random_folds5/random_valid_cv0.csv')
+#valid_df.shape
 
 df = pd.read_csv(f'{DATA_DIR}/mask/{DATASET}.csv')
-df['valid'] = 0
-df.loc[df[ID].isin(valid_df[ID].values), 'valid'] = 1
+#df['valid'] = 0
+#df.loc[df[ID].isin(valid_df[ID].values), 'valid'] = 1
 print(df.shape)
 df.head()
 
@@ -115,7 +115,36 @@ df.head()
 # we can give higher label value if the image probability and cell probability are high, 
 # and the cells from an image with label A were given at least 0.25 of this label A. 
 # The thresholds of the rule were not sensitive according to my experiments.
-cell_df = pd.read_csv(f'{DATA_DIR}/inputs/cellv4b_{DATASET}.csv')
+cell_df = pd.read_csv(f'{DATA_DIR}/inputs/{DATASET}.csv')
+print(cell_df.shape)
+cell_df.head()
+
+df = df.merge(cell_df, how='left', on=[ID, 'maskid'])
+df.shape
+
+labels = df[LABEL_ALIASE_LIST].values
+single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
+single_labels = labels[single_label_idx]
+idx1 = np.where(single_labels==1)
+single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
+
+multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
+multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
+
+df['target'] = 'unknown'
+df.loc[single_label_idx, 'target'] = single_labels
+df.loc[multi_label_idx, 'target'] = multi_labels
+df['target'].value_counts()
+
+#%% Train features
+DATASET = 'train'
+valid_df = pd.read_csv('/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/split/random_folds5/random_valid_cv0.csv')
+valid_df.shape
+
+df = pd.read_csv(f'/home/trangle/HPA_SingleCellClassification//hpa2021_0902/data/mask/{DATASET}.csv')
+df['valid'] = 0
+df.loc[df[ID].isin(valid_df[ID].values), 'valid'] = 1
+cell_df = pd.read_csv(f'/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/inputs/cellv4b_{DATASET}.csv')
 print(cell_df.shape)
 cell_df.head()
 
@@ -137,28 +166,24 @@ df.loc[multi_label_idx, 'target'] = multi_labels
 df['target'].value_counts()
 
 
+train_df = df[(df['target']!='unknown') & df['valid']==0]
+train_df = train_df.groupby('target').head(1000)
+train_features = features[train_df.index]
+train_features.shape
+
+
 #%%
 model_name = 'd0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds'
 file_name = f'cell_features_{DATASET}_default_cell_v1.npz'
 features_file = f'{FEATURE_DIR}/{model_name}/fold0/epoch_12.00_ema/{file_name}'
 features = np.load(features_file, allow_pickle=True)['feats']
 features.shape
+valid_features = features
 
-train_df = df[(df['target']!='unknown') & df['valid']==0]
-train_df = train_df.groupby('target').head(1000)
-train_features = features[train_df.index]
-train_features.shape
 
-valid_df = df[(df['target']!='unknown') & df['valid']==1]
-valid_df = valid_df.groupby('target').head(1000)
-valid_features = features[valid_df.index]
-valid_features.shape
 
 X = preprocessing.scale(np.vstack((train_features, valid_features)))
 train_features = X[:len(train_features)]
-valid_features = X[len(train_features):]
-print(train_features.shape,valid_features.shape)
-
 
 def show_features(predict_valid=True, show_multi=True, title=''):
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
@@ -188,6 +213,10 @@ def show_features(predict_valid=True, show_multi=True, title=''):
     sub_df["id"] = ["_".join([img,str(cell)]) for img, cell in zip(sub_df.ID, sub_df.maskid)]
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False) #/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/multi-location.csv and single-location.csv
     return sub_df
+
+
+
+
     
 #%%
 title = 'multi-location'
