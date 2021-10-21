@@ -149,7 +149,7 @@ def prepare_train_features():
     train_df = train_df.groupby('target').head(1000)
     train_features = features[train_df.index]
     train_features.shape
-    train_features.to_csv(f'{FEATURE_DIR}/inputs/cells_publicHPA.csv', index=False)
+    np.savez_compressed(features_file.replace("trainvalid", "train"), feats=train_features)
 
 def prepare_meta_publicHPA():
     ifimages_v20_ = pd.read_csv(f"{DATA_DIR}/inputs/train.csv")
@@ -196,11 +196,9 @@ def show_features(train_features, features_publicHPA, sub_df, show_multi=True, t
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
     return sub_df
 
-def main():
-
-    prepare_meta_publicHPA()
+def fit_and_transform():
     # Load train features:
-    file_name = f'cell_features_{DATASET}_default_cell_v1_trainvalid.npz'
+    file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
     features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
     train_features = np.load(features_file, allow_pickle=True)['feats']
     train_features.shape
@@ -220,6 +218,36 @@ def main():
     reducer.fit(train_features)
     X = reducer.transform(features_publicHPA.tolist())
     np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA", feats=X)
-    #X = np.load(f"{DATA_DIR}/transformed_publicHPA", allow_pickle=True)['feats']
+
+def plot_umap(show_multi=True,title=''):
+    X = np.load(f"{DATA_DIR}/transformed_publicHPA", allow_pickle=True)['feats']
+    sub_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
+    num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
+    fig, ax = plt.subplots(figsize=(32, 16))
+    for i in range(num_classes):
+        label = LABEL_TO_ALIAS[i]
+        idx = np.where(sub_df['target']==label)[0]
+        x = X[idx, 0]
+        y = X[idx, 1]
+        plt.scatter(x, y, c=COLORS[i],label=LABEL_TO_ALIAS[i], s=16)
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
+    ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
+    plt.title(title, fontsize=24)
+    plt.savefig(f"{DATA_DIR}/{title}.png")
+
+    sub_df["x"] = [idx[0] for idx in X]
+    sub_df["y"] = [idx[1] for idx in X]
+    sub_df["id"] = ["_".join([img,str(cell)]) for img, cell in zip(sub_df.ID, sub_df.maskid)]
+    sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
+
+def main():
+    prepare_train_features()
+    prepare_meta_publicHPA()
+    fit_and_transform()
+    plot_umap(show_multi=True,title='publicHPA_multilocalization')
+    
+
 if __name__ == '__main__':
     main()
