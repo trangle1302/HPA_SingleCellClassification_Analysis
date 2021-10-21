@@ -100,12 +100,12 @@ COLORS = [
 
 #%%
 DATASET = 'train'
-#valid_df = pd.read_csv(f'{DATA_DIR}/split/random_folds5/random_valid_cv0.csv')
-#valid_df.shape
+valid_df = pd.read_csv('/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/split/random_folds5/random_valid_cv0.csv')
+valid_df.shape
 
-df = pd.read_csv(f'{DATA_DIR}/mask/{DATASET}.csv')
-#df['valid'] = 0
-#df.loc[df[ID].isin(valid_df[ID].values), 'valid'] = 1
+df = pd.read_csv(f'/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/mask/{DATASET}.csv')
+df['valid'] = 0
+df.loc[df[ID].isin(valid_df[ID].values), 'valid'] = 1
 print(df.shape)
 df.head()
 
@@ -115,35 +115,6 @@ df.head()
 # we can give higher label value if the image probability and cell probability are high, 
 # and the cells from an image with label A were given at least 0.25 of this label A. 
 # The thresholds of the rule were not sensitive according to my experiments.
-cell_df = pd.read_csv(f'{DATA_DIR}/inputs/{DATASET}.csv')
-print(cell_df.shape)
-cell_df.head()
-
-df = df.merge(cell_df, how='left', on=[ID, 'maskid'])
-df.shape
-
-labels = df[LABEL_ALIASE_LIST].values
-single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
-single_labels = labels[single_label_idx]
-idx1 = np.where(single_labels==1)
-single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
-
-multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
-multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
-
-df['target'] = 'unknown'
-df.loc[single_label_idx, 'target'] = single_labels
-df.loc[multi_label_idx, 'target'] = multi_labels
-df['target'].value_counts()
-
-#%% Train features
-DATASET = 'train'
-valid_df = pd.read_csv('/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/split/random_folds5/random_valid_cv0.csv')
-valid_df.shape
-
-df = pd.read_csv(f'/home/trangle/HPA_SingleCellClassification//hpa2021_0902/data/mask/{DATASET}.csv')
-df['valid'] = 0
-df.loc[df[ID].isin(valid_df[ID].values), 'valid'] = 1
 cell_df = pd.read_csv(f'/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/inputs/cellv4b_{DATASET}.csv')
 print(cell_df.shape)
 cell_df.head()
@@ -165,6 +136,42 @@ df.loc[single_label_idx, 'target'] = single_labels
 df.loc[multi_label_idx, 'target'] = multi_labels
 df['target'].value_counts()
 
+#%% Train features and publicHPA features
+ifimages_v20_ = pd.read_csv("/data/kaggle-dataset/PUBLICHPA/raw/train.csv")
+for col in ['Nucleoplasm', 'NuclearM',
+       'Nucleoli', 'NucleoliFC', 'NuclearS', 'NuclearB', 'EndoplasmicR',
+       'GolgiA', 'IntermediateF', 'ActinF', 'Microtubules', 'MitoticS',
+       'Centrosome', 'PlasmaM', 'Mitochondria', 'Aggresome', 'Cytosol',
+       'VesiclesPCP', 'Negative']:
+    ifimages_v20_[col] = 0
+
+for i, row in ifimages_v20_.iterrows():
+    labels = row.Label.split('|')
+    alias = [LABEL_TO_ALIAS[int(l)] for l in labels if int(l)!= 18]
+    for a in alias:
+        ifimages_v20_.loc[i, a] = 1
+
+
+labels = ifimages_v20_[LABEL_ALIASE_LIST].values
+single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
+single_labels = labels[single_label_idx]
+idx1 = np.where(single_labels==1)
+single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
+multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
+multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
+
+ifimages_v20_['target'] = 'unknown'
+ifimages_v20_.loc[single_label_idx, 'target'] = single_labels
+ifimages_v20_.loc[multi_label_idx, 'target'] = multi_labels
+
+ifimages_v20_.target.value_counts()
+#%% Train features and publicHPA features
+model_name = 'd0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds'
+file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
+file_name = f'cell_features_{DATASET}_default_cell_v1_trainvalid.npz'
+features_file = f'{FEATURE_DIR}/{model_name}/fold0/epoch_12.00_ema/{file_name}'
+features = np.load(features_file, allow_pickle=True)['feats']
+features.shape
 
 train_df = df[(df['target']!='unknown') & df['valid']==0]
 train_df = train_df.groupby('target').head(1000)
@@ -172,25 +179,21 @@ train_features = features[train_df.index]
 train_features.shape
 
 
+features_file = f'{FEATURE_DIR}/{model_name}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
+features_publicHPA.shape
+
 #%%
-model_name = 'd0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds'
-file_name = f'cell_features_{DATASET}_default_cell_v1.npz'
-features_file = f'{FEATURE_DIR}/{model_name}/fold0/epoch_12.00_ema/{file_name}'
-features = np.load(features_file, allow_pickle=True)['feats']
-features.shape
-valid_features = features
-
-
-
-X = preprocessing.scale(np.vstack((train_features, valid_features)))
+features_publicHPA = features_publicHPA[:10000,]
+X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
 train_features = X[:len(train_features)]
 
 def show_features(predict_valid=True, show_multi=True, title=''):
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
     if predict_valid:
         reducer.fit(train_features)
-        X = reducer.transform(valid_features.tolist())
-        sub_df = valid_df
+        X = reducer.transform(features_publicHPA.tolist())
+        sub_df = ifimages_v20_
     else:
         X = reducer.fit_transform(train_features)
         sub_df = train_df
@@ -215,9 +218,9 @@ def show_features(predict_valid=True, show_multi=True, title=''):
     return sub_df
 
 
-
-
-    
+show_features(predict_valid=True, show_multi=False, title='umap_publicHPA_single_location')
+show_features(predict_valid=True, show_multi=True, title='umap_publicHPA_multi_locations')
+""" 
 #%%
 title = 'multi-location'
 sub_df = show_features(predict_valid=False, show_multi=True, title=title)
@@ -249,3 +252,4 @@ if True:
     ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
     ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
     plt.title(title, fontsize=24)
+"""
