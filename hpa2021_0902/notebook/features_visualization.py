@@ -139,7 +139,7 @@ df['target'].value_counts()
 
 #%%
 model_name = 'd0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds'
-file_name = f'cell_features_{DATASET}_default_cell_v1.npz'
+file_name = f'cell_features_{DATASET}_default_cell_v1_trainvalid.npz'
 features_file = f'{FEATURE_DIR}/{model_name}/fold0/epoch_12.00_ema/{file_name}'
 features = np.load(features_file, allow_pickle=True)['feats']
 features.shape
@@ -206,6 +206,7 @@ if True:
     else:
         X = reducer.fit_transform(train_features)
         sub_df = train_df
+
 
     num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
     fig, ax = plt.subplots(figsize=(32, 16))
