@@ -137,20 +137,9 @@ df.loc[multi_label_idx, 'target'] = multi_labels
 df['target'].value_counts()
 
 #%% Train features and publicHPA features
-ifimages_v20_ = pd.read_csv("/data/kaggle-dataset/PUBLICHPA/raw/train.csv")
-for col in ['Nucleoplasm', 'NuclearM',
-       'Nucleoli', 'NucleoliFC', 'NuclearS', 'NuclearB', 'EndoplasmicR',
-       'GolgiA', 'IntermediateF', 'ActinF', 'Microtubules', 'MitoticS',
-       'Centrosome', 'PlasmaM', 'Mitochondria', 'Aggresome', 'Cytosol',
-       'VesiclesPCP', 'Negative']:
-    ifimages_v20_[col] = 0
-
-for i, row in ifimages_v20_.iterrows():
-    labels = row.Label.split('|')
-    alias = [LABEL_TO_ALIAS[int(l)] for l in labels if int(l)!= 18]
-    for a in alias:
-        ifimages_v20_.loc[i, a] = 1
-
+ifimages_v20_ = pd.read_csv("/data/kaggle-dataset/PUBLICHPA/inputs/train.csv")
+masks = pd.read_csv("/data/kaggle-dataset/PUBLICHPA/mask/train.csv")
+ifimages_v20_ = ifimages_v20_.merge(masks, how='inner', on=['ID', 'ImageHeight', 'ImageWidth'])
 
 labels = ifimages_v20_[LABEL_ALIASE_LIST].values
 single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
@@ -167,7 +156,6 @@ ifimages_v20_.loc[multi_label_idx, 'target'] = multi_labels
 ifimages_v20_.target.value_counts()
 #%% Train features and publicHPA features
 model_name = 'd0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds'
-file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
 file_name = f'cell_features_{DATASET}_default_cell_v1_trainvalid.npz'
 features_file = f'{FEATURE_DIR}/{model_name}/fold0/epoch_12.00_ema/{file_name}'
 features = np.load(features_file, allow_pickle=True)['feats']
@@ -179,12 +167,13 @@ train_features = features[train_df.index]
 train_features.shape
 
 
+file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
 features_file = f'{FEATURE_DIR}/{model_name}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
 features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
 features_publicHPA.shape
 
 #%%
-features_publicHPA = features_publicHPA[:10000,]
+#features_publicHPA = features_publicHPA
 X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
 train_features = X[:len(train_features)]
 
@@ -220,6 +209,9 @@ def show_features(predict_valid=True, show_multi=True, title=''):
 
 show_features(predict_valid=True, show_multi=False, title='umap_publicHPA_single_location')
 show_features(predict_valid=True, show_multi=True, title='umap_publicHPA_multi_locations')
+
+
+
 """ 
 #%%
 title = 'multi-location'
