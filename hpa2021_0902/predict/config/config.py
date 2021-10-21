@@ -9,7 +9,6 @@ from argparse import Namespace
 
 sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 hostname = socket.gethostname()
-/home/trangle/HPA_SingleCellClassification/hpa2021_0902/predict/config/config.py
 DIR_CFGS = Namespace()
 DIR_CFGS.RESULT_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/result'
 DIR_CFGS.MODEL_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/models'
