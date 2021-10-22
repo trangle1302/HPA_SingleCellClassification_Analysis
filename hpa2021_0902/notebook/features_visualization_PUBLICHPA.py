@@ -18,7 +18,8 @@ sns.set(style='white', color_codes=True)
 
 from sklearn import preprocessing
 from sklearn.manifold import TSNE
-import umap
+import umap    
+import joblib
 
 osp = os.path
 ope = os.path.exists
@@ -196,7 +197,7 @@ def show_features(train_features, features_publicHPA, sub_df, show_multi=True, t
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
     return sub_df
 
-def fit_and_transform():
+def fit_umap():
     # Load train features:
     file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
     features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
@@ -212,12 +213,30 @@ def fit_and_transform():
     # Preprocess
     X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
     train_features = X[:len(train_features)]
+    features_publicHPA = X[len(train_features):]
+
+    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
+    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+    np.savez_compressed(features_file, feats=features_publicHPA)
     print("train_features processed, new shape ", train_features.shape)
 
     # Fit and transform
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
     reducer.fit(train_features)
     print("umap fitted to train_features")
+
+    filename = f"{DATA_DIR}/fitted_umap.sav"
+    joblib.dump(reducer, filename)
+
+def transform_umap():    
+    # Load publicHPA features
+    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
+    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+    features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
+    print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
+
+    filename = f"{DATA_DIR}/fitted_umap.sav"
+    reducer = joblib.load(filename)
     X = reducer.transform(features_publicHPA.tolist())
     np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
 
@@ -247,7 +266,8 @@ def plot_umap(show_multi=True,title=''):
 def main():
     #prepare_train_features()
     #prepare_meta_publicHPA()
-    fit_and_transform()
+    #fit_umap()
+    transform_umap()
     plot_umap(show_multi=True,title='publicHPA_multilocalization')
     
 
