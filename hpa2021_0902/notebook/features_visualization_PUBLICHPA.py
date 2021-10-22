@@ -201,23 +201,25 @@ def fit_and_transform():
     file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
     features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
     train_features = np.load(features_file, allow_pickle=True)['feats']
-    train_features.shape
+    print("train_features loaded with shape ", train_features.shape)
 
     # Load publicHPA features
     file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
     features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
     features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
-    features_publicHPA.shape
+    print("publicHPA_features loaded with shape ", features_publicHPA.shape)
 
     # Preprocess
     X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
     train_features = X[:len(train_features)]
+    print("train_features processed, new shape ", train_features.shape)
 
     # Fit and transform
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
     reducer.fit(train_features)
+    print("umap fitted to train_features")
     X = reducer.transform(features_publicHPA.tolist())
-    np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA", feats=X)
+    np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
 
 def plot_umap(show_multi=True,title=''):
     X = np.load(f"{DATA_DIR}/transformed_publicHPA", allow_pickle=True)['feats']
@@ -243,8 +245,8 @@ def plot_umap(show_multi=True,title=''):
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
 
 def main():
-    prepare_train_features()
-    prepare_meta_publicHPA()
+    #prepare_train_features()
+    #prepare_meta_publicHPA()
     fit_and_transform()
     plot_umap(show_multi=True,title='publicHPA_multilocalization')
     
