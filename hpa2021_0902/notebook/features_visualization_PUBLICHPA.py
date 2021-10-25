@@ -197,42 +197,71 @@ def show_features(train_features, features_publicHPA, sub_df, show_multi=True, t
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
     return sub_df
 
-def fit_umap():
-    # Load train features:
-    file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
-    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
-    train_features = np.load(features_file, allow_pickle=True)['feats']
-    print("train_features loaded with shape ", train_features.shape)
+def fit_umap(preprocess=True):
+    if preprocess:
+        # Load train features:
+        file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
+        train_features = np.load(features_file, allow_pickle=True)['feats']
+        print("train_features loaded with shape ", train_features.shape)
 
-    # Load publicHPA features
-    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
-    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-    features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
-    print("publicHPA_features loaded with shape ", features_publicHPA.shape)
+        # Load publicHPA features
+        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+        features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
+        print("publicHPA_features loaded with shape ", features_publicHPA.shape)
 
-    # Preprocess
-    X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
-    train_features = X[:len(train_features)]
-    features_publicHPA = X[len(train_features):]
+        # Preprocess
+        X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
+        train_features = X[:len(train_features)]
 
-    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
-    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-    np.savez_compressed(features_file, feats=features_publicHPA)
-    print("train_features processed, new shape ", train_features.shape)
+        file_name = f'cell_features_{DATASET}_default_cell_v1_train_transformed.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
+        np.savez_compressed(features_file, feats=train_features)
+        print("train_features processed, new shape ", train_features.shape)
+        
+        features_publicHPA = X[len(train_features):]
+        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+        np.savez_compressed(features_file, feats=features_publicHPA)
+        print("features_publicHPA processed, new shape ", train_features.shape)
+    else:
+        # Load train features:
+        file_name = f'cell_features_{DATASET}_default_cell_v1_train_transformed.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
+        train_features = np.load(features_file, allow_pickle=True)['feats']
+        print("transformed train_features loaded with shape ", train_features.shape)
+
+        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+        features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
+        print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
 
     # Fit and transform
-    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
+    reducer = umap.UMAP(
+        n_neighbors=30, 
+        min_dist=0.1, 
+        n_components=2, 
+        metric='euclidean', 
+        random_state=33,
+        n_epochs =100,
+        transform_queue_size=2, 
+        low_memory = False,
+        verbose=True)
     reducer.fit(train_features)
     print("umap fitted to train_features")
 
     filename = f"{DATA_DIR}/fitted_umap.sav"
     joblib.dump(reducer, filename)
 
+    #X = reducer.transform(features_publicHPA.tolist())
+    #np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
+
 def transform_umap():    
     # Load publicHPA features
     file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
     features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-    features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
+    features_publicHPA = np.load(features_file, allow_pickle=True)['feats'][:500000]
     print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
 
     filename = f"{DATA_DIR}/fitted_umap.sav"
@@ -240,9 +269,28 @@ def transform_umap():
     X = reducer.transform(features_publicHPA.tolist())
     np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
 
+def transform_umap_point_by_point():    
+    # Load publicHPA features
+    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
+    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+    features_publicHPA = np.load(features_file, allow_pickle=True)['feats'][:500000]
+    print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
+
+    filename = f"{DATA_DIR}/fitted_umap.sav"
+    reducer = joblib.load(filename)
+    X = reducer.transform(features_publicHPA.tolist())
+    np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
+
+def transform_point(reducer, points):
+    # Super slow, time increases astronomically 
+    transformed_X = []
+    for i in range(len(points)):
+        transformed_X += [reducer.transform(points[i: i+1].tolist())]
+    return np.array(transformed_X)
+
 def plot_umap(show_multi=True,title=''):
-    X = np.load(f"{DATA_DIR}/transformed_publicHPA", allow_pickle=True)['feats']
-    sub_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
+    X = np.load(f"{DATA_DIR}/transformed_publicHPA.npz", allow_pickle=True)['feats']
+    sub_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')[:500000]
     num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
     fig, ax = plt.subplots(figsize=(32, 16))
     for i in range(num_classes):
