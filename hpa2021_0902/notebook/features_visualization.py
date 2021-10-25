@@ -198,16 +198,27 @@ target_format = pd.read_csv("/home/trangle/Downloads/umap_results_fit_all_transf
 predict_valid = True
 show_multi = True
 if True:
+    
+    title = 'valid_onefifth_concat'
+    parts = len(valid_features)//5
+    X = []
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
-    if predict_valid:
-        reducer.fit(train_features)
-        X = reducer.transform(valid_features.tolist())
-        sub_df = valid_df
-    else:
-        X = reducer.fit_transform(train_features)
-        sub_df = train_df
+    reducer.fit(train_features)
+    X += [reducer.transform(valid_features[:parts].tolist())]
+    X += [reducer.transform(valid_features[parts:2*parts].tolist())]
+    X += [reducer.transform(valid_features[2*parts:3*parts].tolist())]
+    X += [reducer.transform(valid_features[3*parts:4*parts].tolist())]
+    X += [reducer.transform(valid_features[4*parts:].tolist())]
+    #X = reducer.transform(valid_features.tolist())
+    sub_df = valid_df
+    
+    X = np.concatenate(X)
 
-
+    """
+    title = 'train'
+    X = reducer.fit_transform(train_features)
+    sub_df = train_df
+    """
     num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
     fig, ax = plt.subplots(figsize=(32, 16))
     for i in range(num_classes):
@@ -221,3 +232,44 @@ if True:
     ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
     ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
     plt.title(title, fontsize=24)
+
+#%% Shuffle valid index
+import random
+if True:
+    random.seed(20)
+    indexes = list(range(len(valid_df)))
+    random.shuffle(indexes)
+    #sub_df = valid_df.sample(frac = 1, random_state=10)
+    #order = list(sub_df.index)
+    
+    sub_df = valid_df.iloc[indexes]
+    valid_features_ordered = valid_features[indexes,:]
+    
+    title = 'valid_shuffle_onefifth_concat'
+    parts = len(valid_features)//5
+    X = []
+    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
+    reducer.fit(train_features)
+    X += [reducer.transform(valid_features_ordered[:parts].tolist())]
+    X += [reducer.transform(valid_features_ordered[parts:2*parts].tolist())]
+    X += [reducer.transform(valid_features_ordered[2*parts:3*parts].tolist())]
+    X += [reducer.transform(valid_features_ordered[3*parts:4*parts].tolist())]
+    X += [reducer.transform(valid_features_ordered[4*parts:].tolist())]
+    #X = reducer.transform(valid_features.tolist())
+    sub_df = valid_df
+    
+    X = np.concatenate(X)
+    num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
+    fig, ax = plt.subplots(figsize=(32, 16))
+    for i in range(num_classes):
+        label = LABEL_TO_ALIAS[i]
+        idx = np.where(sub_df['target']==label)[0]
+        x = X[idx, 0]
+        y = X[idx, 1]
+        plt.scatter(x, y, c=COLORS[i],label=LABEL_TO_ALIAS[i], s=16)
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
+    ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
+    plt.title(title, fontsize=24)
+    
