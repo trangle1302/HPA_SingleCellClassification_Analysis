@@ -233,32 +233,43 @@ if True:
     ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
     plt.title(title, fontsize=24)
 
-#%% Shuffle valid index
+#%% Shuffle valid indexes
 import random
+shuffle = True
+split_n_parts = False
 if True:
-    random.seed(20)
-    indexes = list(range(len(valid_df)))
-    random.shuffle(indexes)
-    #sub_df = valid_df.sample(frac = 1, random_state=10)
-    #order = list(sub_df.index)
     
-    sub_df = valid_df.iloc[indexes]
-    valid_features_ordered = valid_features[indexes,:]
+    title = 'valid_shuffle_all'
+    if shuffle:
+        valid_df_reindex = valid_df.reset_index() # reset indexes to 0,1,2,...
+        random.seed(10)
+        indexes = list(range(len(valid_df_reindex)))
+        random.shuffle(indexes)
+        #sub_df = valid_df.sample(frac = 1, random_state=10)
+        #order = list(sub_df.index)
+        
+        sub_df = valid_df_reindex.iloc[indexes]
+        valid_features_ordered = valid_features[indexes,:]
+    else:
+        sub_df = valid_df
+        valid_features_ordered = valid_features
     
-    title = 'valid_shuffle_onefifth_concat'
-    parts = len(valid_features)//5
-    X = []
-    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
-    reducer.fit(train_features)
-    X += [reducer.transform(valid_features_ordered[:parts].tolist())]
-    X += [reducer.transform(valid_features_ordered[parts:2*parts].tolist())]
-    X += [reducer.transform(valid_features_ordered[2*parts:3*parts].tolist())]
-    X += [reducer.transform(valid_features_ordered[3*parts:4*parts].tolist())]
-    X += [reducer.transform(valid_features_ordered[4*parts:].tolist())]
-    #X = reducer.transform(valid_features.tolist())
-    sub_df = valid_df
-    
-    X = np.concatenate(X)
+    if split_n_parts:
+        parts = len(valid_features)//5
+        X = []
+        reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
+        reducer.fit(train_features)
+        X += [reducer.transform(valid_features_ordered[:parts].tolist())]
+        X += [reducer.transform(valid_features_ordered[parts:2*parts].tolist())]
+        X += [reducer.transform(valid_features_ordered[2*parts:3*parts].tolist())]
+        X += [reducer.transform(valid_features_ordered[3*parts:4*parts].tolist())]
+        X += [reducer.transform(valid_features_ordered[4*parts:].tolist())]
+        X = np.concatenate(X)
+    else:
+        X = reducer.transform(valid_features_ordered.tolist())
+        
+    #X = reducer.fit_transform(valid_features_ordered[4*parts:].tolist())
+    #sub_df = valid_df[4*parts:]
     num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
     fig, ax = plt.subplots(figsize=(32, 16))
     for i in range(num_classes):
@@ -272,4 +283,41 @@ if True:
     ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
     ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
     plt.title(title, fontsize=24)
+
+#%% Gradually reduce part size
+
+def plot_umap(train_features, valid_features, sub_df, title=''):
+    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean', verbose=True)
+    reducer.fit(train_features)
     
+    X = reducer.transform(valid_features.tolist())
+    
+    num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
+    fig, ax = plt.subplots(figsize=(32, 16))
+    for i in range(num_classes):
+        label = LABEL_TO_ALIAS[i]
+        idx = np.where(sub_df['target']==label)[0]
+        x = X[idx, 0]
+        y = X[idx, 1]
+        plt.scatter(x, y, c=COLORS[i],label=LABEL_TO_ALIAS[i], s=16)
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
+    ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
+    plt.title(title, fontsize=24)
+
+#%%
+valid_df_ori = valid_df.copy()
+
+
+valid_df = valid_df_ori.reset_index() # reset indexes to 0,1,2,...
+random.seed(10)
+indexes = list(range(len(valid_df)))
+random.shuffle(indexes)
+sub_df_ordered = valid_df.iloc[indexes]
+valid_features_ordered = valid_features[indexes,:]
+
+
+title = 'valid_shuffle_80%'
+n = int(len(valid_df)*0.8)
+plot_umap(train_features, valid_features_ordered[:n], sub_df_ordered[:n], title)
