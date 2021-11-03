@@ -74,6 +74,7 @@ def main(args):
   print(mask_df['mask_area'].describe())
   print(mask_df[WIDTH].describe())
   print(mask_df[HEIGHT].describe())
+  mask_df.to_csv(f'{DIR_CFGS.DATA_DIR}/images/{args.dataset}_maskdf.csv')
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='segment cell')
