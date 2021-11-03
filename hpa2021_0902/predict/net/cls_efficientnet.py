@@ -82,6 +82,7 @@ class EfficientnetClsNet(nn.Module):
     logits = self.logit(x)
     data['logits'] = logits
     data['features'] = features
+    data['feature_vector'] = x
     if self.do_ml:
       ml_features = x
       ml_logits = self.ml_logit(x)
