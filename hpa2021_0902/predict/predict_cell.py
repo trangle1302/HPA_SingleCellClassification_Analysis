@@ -154,6 +154,7 @@ def predict_cell_result(args, test_loader, model):
       augment_result_df.to_csv(augment_result_fpath, index=False, encoding='utf-8')
       augment_feature_fpath = augment_result_fpath.replace('.csv', '').replace('result', 'features')
       np.savez_compressed(augment_feature_fpath, feats=result_feats)
+      print(f'Saving features at: {augment_feature_fpath}')
 
     if result_df is None:
       result_df = augment_result_df
