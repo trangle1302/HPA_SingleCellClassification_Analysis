@@ -359,13 +359,19 @@ def show_features_separate(train_features, features_publicHPA, sub_df, show_mult
     return sub_df
 
 
-def show_features_fit_transform(features, sub_df, show_multi=True, title=''):
-    features = preprocessing.scale(features, axis=0)
+def show_features_fit_transform(features, sub_df, umap_args, pca=False, show_multi=True, title=''):
+    if pca:
+        pca = PCA(n_components=100)
+        features = preprocessing.scale(features)
+        features = pca.fit_transform(features)
+        print(pca.explained_variance_ratio_)
+    else:
+        features = preprocessing.scale(features, axis=0)
     reducer = umap.UMAP(
-        n_neighbors=15, 
-        min_dist=0.1, 
-        n_components=2, 
-        metric='euclidean',
+        n_neighbors=umap_args['n_neighbors'], 
+        min_dist=umap_args['min_dist'], 
+        n_components=umap_args['n_components'], 
+        metric=umap_args['metric'],
         random_state=99, 
         verbose=True)
     X = reducer.fit_transform(features.tolist())
@@ -388,18 +394,21 @@ def show_features_fit_transform(features, sub_df, show_multi=True, title=''):
     
     sub_df["x"] = [idx[0] for idx in X]
     sub_df["y"] = [idx[1] for idx in X]
+    if umap_args['n_components'] == 3:
+        sub_df["z"] = [idx[2] for idx in X]
     sub_df["id"] = ["_".join([img,str(cell)]) for img, cell in zip(sub_df.ID, sub_df.maskid)]
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
     return sub_df
 #%%
 def main():
     #prepare_train_features()
-    prepare_meta_publicHPA()
+    #prepare_meta_publicHPA()
     #fit_umap()
     #fit_transform_plot()
     #transform_umap()
     #plot_umap(show_multi=True,title='publicHPA_multilocalization')
     
+    '''
     # Load train features:
     DATASET='train'
     file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
@@ -407,37 +416,62 @@ def main():
     train_features = np.load(features_file, allow_pickle=True)['feats']
     print("train_features loaded with shape ", train_features.shape)
     train_df = pd.read_csv(f'/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/inputs/cellv4b_{DATASET}_subsettrain.csv')
-    
+    '''
+
     # Load publicHPA features
     file_name_publicHPA = 'cell_features_test_default_cell_v1.npz'
     features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
     features_publicHPA_0 = np.load(features_file, allow_pickle=True)['feats']
     print("publicHPA_features loaded with shape ", features_publicHPA_0.shape)
-    #public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction.csv')
-    public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
+    public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction.csv')
+    #public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
     #public_hpa_df0 = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
     
     #label_df = train_df.groupby('target').head(3000)
     #feature_matrix = train_features[label_df.index]
     
     label_df = public_hpa_df.groupby('target').head(10000)
-    feature_matrix =  features_publicHPA_0[label_df.index]
-    label_df = public_hpa_df[:10000]
-    feature_matrix =  features_publicHPA_0[:10000]
-    
+    feature_matrix =  features_publicHPA_0[label_df.index]    
     
     """ Performing PCA
-    
     pca = PCA(n_components=10)
     feature_matrix = preprocessing.scale(feature_matrix)
     feature_matrix = pca.fit_transform(feature_matrix)
     pca.explained_variance_ratio_
+
+    lovain
+    scanpy
+    testg pca with small data
     """
+    for n in [15,30]:
+        for d in [0.1,0.25,0.5]:
+            for m in ['euclidean', 'braycurtis','seuclidean']:
+                args = dict({
+                    'n_neighbors':n, 
+                    'min_dist':d, 
+                    'n_components':2, 
+                    'metric':m
+                })
+                plottile = 'sl_pHPA10000_{n}_{d}_{m}_{}_2d'
+                show_features_fit_transform(feature_matrix, label_df, args, pca=False, show_multi=False, title=plottile)
     
-    show_features_fit_transform(feature_matrix, label_df, show_multi=True, title='multi-location_publicHPAhead10000_eucledian')
+    import gc
+    gc.collect()
+    
     label_df = public_hpa_df.groupby('target').head(100000)
-    feature_matrix =  features_publicHPA_0[label_df.index]
-    show_features_fit_transform(feature_matrix, label_df, show_multi=True, title='multi-location_publicHPAhead100000_eucledian')
+    feature_matrix =  features_publicHPA_0[label_df.index]     
+    for n in [15,30]:
+        for d in [0.1,0.5]:
+            for m in ['euclidean']:
+                args = dict({
+                    'n_neighbors':n, 
+                    'min_dist':d, 
+                    'n_components':2, 
+                    'metric':m
+                })
+    plottile = 'sl_pHPA100000_pca_{n}_{d}_{m}_{}_2d'
+    show_features_fit_transform(feature_matrix, label_df, args, pca=True, show_multi=False, title=plottile)
+
 
 if __name__ == '__main__':
     main()
