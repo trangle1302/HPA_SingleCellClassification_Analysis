@@ -22,7 +22,8 @@ output :
     DATA_DIR/inputs/{DATASET}.csv
     DATA_DIR/mask/{DATASET}
     DATA_DIR/mask/{DATASET}.csv
-
+### python s2_generate_cellimage.py --n_cpu 16 --dataset test --cell_type 1 --image_size 512
+### python s3_resize_images.py --image_size 128 --suffix png --dataset test_cell_v1
 3.2 Generate cropped cell images and resize to 128x128
 process :
     cd CODE_DIR/data_process/
