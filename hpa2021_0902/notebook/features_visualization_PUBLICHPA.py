@@ -18,6 +18,7 @@ sns.set(style='white', color_codes=True)
 
 from sklearn import preprocessing
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 import umap    
 import joblib
 
@@ -146,18 +147,56 @@ def prepare_train_features():
     features.shape
 
     # filter train features
-    train_df = df[(df['target']!='unknown') & df['valid']==0]
-    train_df = train_df.groupby('target').head(1000)
+    train_df = df[(df['target']!='unknown') & (df['valid']==0)]
+    train_df.target.value_counts()
+    #train_df = train_df.groupby('target').head(2000)
+    train_df.to_csv(f'/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/inputs/cellv4b_{DATASET}_subsettrain.csv')
     train_features = features[train_df.index]
     train_features.shape
     np.savez_compressed(features_file.replace("trainvalid", "train"), feats=train_features)
 
 def prepare_meta_publicHPA():
-    ifimages_v20_ = pd.read_csv(f"{DATA_DIR}/inputs/train.csv")
-    masks = pd.read_csv(f"{DATA_DIR}/mask/train.csv")
-    ifimages_v20_ = ifimages_v20_.merge(masks, how='inner', on=['ID', 'ImageHeight', 'ImageWidth'])
-
-    labels = ifimages_v20_[LABEL_ALIASE_LIST].values
+    cells_publicHPA_path = f'{DATA_DIR}/inputs/cells_publicHPA.csv'
+    if os.path.exists(cells_publicHPA_path):
+        ifimages_v20_ = pd.read_csv(cells_publicHPA_path)
+    else:
+        ifimages_v20_ = pd.read_csv(f"{DATA_DIR}/inputs/{DATASET}.csv")
+        masks = pd.read_csv(f"{DATA_DIR}/mask/{DATASET}.csv")
+        ifimages_v20_ = ifimages_v20_.merge(masks, how='inner', on=['ID', 'ImageHeight', 'ImageWidth'])
+    
+        labels = ifimages_v20_[LABEL_ALIASE_LIST].values
+        single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
+        single_labels = labels[single_label_idx]
+        idx1 = np.where(single_labels==1)
+        single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
+        multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
+        multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
+    
+        ifimages_v20_['target'] = 'unknown'
+        ifimages_v20_.loc[single_label_idx, 'target'] = single_labels
+        ifimages_v20_.loc[multi_label_idx, 'target'] = multi_labels
+    
+        ifimages_v20_.target.value_counts()
+        #ifimages_v20_.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv', index=False)
+    
+    ### Merge HPA image-level labels and predicted SC levels from bestfitting best single model
+    # Do some rules like bestfitting to combine image-level labels and predicted SC labels?
+    prediction = pd.read_csv(f'{FEATURE_DIR.replace("features","result")}/{MODEL_NAME}/fold0/epoch_12.00_ema/cell_result_test_cell_v1.csv')
+    prediction["cellmask"] = prediction["mask"]
+    prediction = prediction.drop(columns=["mask"])    
+    tmp = prediction.merge(ifimages_v20_, how='inner', on=['ID', 'cellmask','maskid'])
+    
+    il_labels = tmp[[l+'_y' for l in LABEL_ALIASE_LIST]].values
+    sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
+    sc_labels = np.array([c/c.max() for c in sc_labels])
+    sc_labels = pd.DataFrame(np.round(il_labels*sc_labels).astype('uint8'))
+    sc_labels.columns = LABEL_ALIASE_LIST
+    
+    df_c = pd.concat([tmp[["ID", "Label", "maskid", 'cellmask', 'ImageWidth', 'ImageHeight']], sc_labels], axis=1)
+    labels = df_c[LABEL_ALIASE_LIST].values
+    negatives_idx = np.where(labels.sum(axis=1)==0)[0]
+    df_c.loc[negatives_idx, "Negative"] = 1
+    
     single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
     single_labels = labels[single_label_idx]
     idx1 = np.where(single_labels==1)
@@ -165,16 +204,138 @@ def prepare_meta_publicHPA():
     multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
     multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
 
-    ifimages_v20_['target'] = 'unknown'
-    ifimages_v20_.loc[single_label_idx, 'target'] = single_labels
-    ifimages_v20_.loc[multi_label_idx, 'target'] = multi_labels
+    df_c['target'] = 'Negative'
+    df_c.loc[single_label_idx, 'target'] = single_labels
+    df_c.loc[multi_label_idx, 'target'] = multi_labels
 
-    ifimages_v20_.target.value_counts()
+    df_c.target.value_counts()
+    df_c.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction.csv', index=False)
+    
+    
+    # Reorganize cells_publicHPA.csv for correct cell order with features file
+    il_labels = pd.DataFrame(il_labels)
+    il_labels.columns = LABEL_ALIASE_LIST
+    ifimages_v20_ = pd.concat([df_c[["ID", "Label", "maskid", 'cellmask', 'ImageWidth', 'ImageHeight', 'target']], il_labels], axis=1)
     ifimages_v20_.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv', index=False)
+    
+    
+def roundToNearest(inputNumber, base=0.25):
+    return base*round(inputNumber/base)
 
+def fit_umap(preprocess=True):
+    if preprocess:
+        # Load train features:
+        file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
+        train_features = np.load(features_file, allow_pickle=True)['feats']
+        print("train_features loaded with shape ", train_features.shape)
 
-def show_features(train_features, features_publicHPA, sub_df, show_multi=True, title=''):
-    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33)
+        # Load publicHPA features
+        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+        features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
+        print("publicHPA_features loaded with shape ", features_publicHPA.shape)
+
+        # Preprocess
+        X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
+        train_features = X[:len(train_features)]
+
+        file_name = f'cell_features_{DATASET}_default_cell_v1_train_preprocessed.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
+        np.savez_compressed(features_file, feats=train_features)
+        print("train_features processed, new shape ", train_features.shape)
+        
+        features_publicHPA = X[len(train_features):]
+        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_preprocessed.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+        np.savez_compressed(features_file, feats=features_publicHPA)
+        print("features_publicHPA processed, new shape ", train_features.shape)
+    else:
+        # Load train features:
+        file_name = f'cell_features_{DATASET}_default_cell_v1_train_preprocessed.npz'
+        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
+        train_features = np.load(features_file, allow_pickle=True)['feats']
+        print("processed train_features loaded with shape ", train_features.shape)
+
+        #file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_preprocessed.npz'
+        #features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+        #features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
+        #print("processed publicHPA_features loaded with shape ", features_publicHPA.shape)
+
+    # Fit (and transform)
+    reducer = umap.UMAP(
+        n_neighbors=15, 
+        min_dist=0.1, 
+        n_components=2, 
+        metric='euclidean', 
+        random_state=33,
+        n_epochs =100,
+        transform_queue_size=2, 
+        low_memory = False,
+        verbose=True)
+    reducer.fit(train_features)
+    print("umap fitted to train_features")
+
+    filename = f"{DATA_DIR}/fitted_umap.sav"
+    joblib.dump(reducer, filename)
+
+    #X = reducer.transform(features_publicHPA.tolist())
+    #np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
+
+def transform_umap():    
+    # Load publicHPA features
+    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_preprocessed.npz'
+    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+    features_publicHPA = np.load(features_file, allow_pickle=True)['feats'][:500000]
+    print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
+
+    # Fit (and transform)
+    reducer = umap.UMAP(
+        n_neighbors=15, 
+        min_dist=0.1, 
+        n_components=2, 
+        metric='euclidean', 
+        random_state=20,
+        n_epochs =100,
+        transform_queue_size=2, 
+        low_memory = False,
+        verbose=True)
+    X = reducer.fit_transform(features_publicHPA.tolist())
+    np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
+    
+
+def transform_points(reducer, points):
+    # Super slow, time increases astronomically 
+    transformed_X = []
+    for i in range(len(points)):
+        transformed_X += [reducer.transform(points[i: i+1].tolist())]
+    return np.array(transformed_X)
+
+def plot_umap(show_multi=True,title=''):
+    X = np.load(f"{DATA_DIR}/transformed_publicHPA.npz", allow_pickle=True)['feats']
+    sub_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')[:50000]
+    num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
+    fig, ax = plt.subplots(figsize=(32, 16))
+    for i in range(num_classes):
+        label = LABEL_TO_ALIAS[i]
+        idx = np.where(sub_df['target']==label)[0]
+        x = X[idx, 0]
+        y = X[idx, 1]
+        plt.scatter(x, y, c=COLORS[i],label=LABEL_TO_ALIAS[i], s=16)
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
+    ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
+    plt.title(title, fontsize=24)
+    plt.savefig(f"{DATA_DIR}/{title}.png")
+
+    sub_df["x"] = [idx[0] for idx in X]
+    sub_df["y"] = [idx[1] for idx in X]
+    sub_df["id"] = ["_".join([img,str(cell)]) for img, cell in zip(sub_df.ID, sub_df.maskid)]
+    sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
+
+def show_features_separate(train_features, features_publicHPA, sub_df, show_multi=True, title=''):
+    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean',random_state=33, verbose=True)
     reducer.fit(train_features)
     X = reducer.transform(features_publicHPA.tolist())
 
@@ -197,100 +358,18 @@ def show_features(train_features, features_publicHPA, sub_df, show_multi=True, t
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
     return sub_df
 
-def fit_umap(preprocess=True):
-    if preprocess:
-        # Load train features:
-        file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
-        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
-        train_features = np.load(features_file, allow_pickle=True)['feats']
-        print("train_features loaded with shape ", train_features.shape)
 
-        # Load publicHPA features
-        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA.npz'
-        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-        features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
-        print("publicHPA_features loaded with shape ", features_publicHPA.shape)
-
-        # Preprocess
-        X = preprocessing.scale(np.vstack((train_features, features_publicHPA)))
-        train_features = X[:len(train_features)]
-
-        file_name = f'cell_features_{DATASET}_default_cell_v1_train_transformed.npz'
-        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
-        np.savez_compressed(features_file, feats=train_features)
-        print("train_features processed, new shape ", train_features.shape)
-        
-        features_publicHPA = X[len(train_features):]
-        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
-        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-        np.savez_compressed(features_file, feats=features_publicHPA)
-        print("features_publicHPA processed, new shape ", train_features.shape)
-    else:
-        # Load train features:
-        file_name = f'cell_features_{DATASET}_default_cell_v1_train_transformed.npz'
-        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
-        train_features = np.load(features_file, allow_pickle=True)['feats']
-        print("transformed train_features loaded with shape ", train_features.shape)
-
-        file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
-        features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-        features_publicHPA = np.load(features_file, allow_pickle=True)['feats']
-        print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
-
-    # Fit and transform
+def show_features_fit_transform(features, sub_df, show_multi=True, title=''):
+    features = preprocessing.scale(features, axis=0)
     reducer = umap.UMAP(
-        n_neighbors=30, 
+        n_neighbors=15, 
         min_dist=0.1, 
         n_components=2, 
-        metric='euclidean', 
-        random_state=33,
-        n_epochs =100,
-        transform_queue_size=2, 
-        low_memory = False,
+        metric='euclidean',
+        random_state=99, 
         verbose=True)
-    reducer.fit(train_features)
-    print("umap fitted to train_features")
+    X = reducer.fit_transform(features.tolist())
 
-    filename = f"{DATA_DIR}/fitted_umap.sav"
-    joblib.dump(reducer, filename)
-
-    #X = reducer.transform(features_publicHPA.tolist())
-    #np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
-
-def transform_umap():    
-    # Load publicHPA features
-    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
-    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-    features_publicHPA = np.load(features_file, allow_pickle=True)['feats'][:500000]
-    print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
-
-    filename = f"{DATA_DIR}/fitted_umap.sav"
-    reducer = joblib.load(filename)
-    X = reducer.transform(features_publicHPA.tolist())
-    np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
-
-def transform_umap_point_by_point():    
-    # Load publicHPA features
-    file_name_publicHPA = 'cell_features_train_default_cell_v1_publicHPA_transformed.npz'
-    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
-    features_publicHPA = np.load(features_file, allow_pickle=True)['feats'][:500000]
-    print("transformed publicHPA_features loaded with shape ", features_publicHPA.shape)
-
-    filename = f"{DATA_DIR}/fitted_umap.sav"
-    reducer = joblib.load(filename)
-    X = reducer.transform(features_publicHPA.tolist())
-    np.savez_compressed(f"{DATA_DIR}/transformed_publicHPA.npz", feats=X)
-
-def transform_point(reducer, points):
-    # Super slow, time increases astronomically 
-    transformed_X = []
-    for i in range(len(points)):
-        transformed_X += [reducer.transform(points[i: i+1].tolist())]
-    return np.array(transformed_X)
-
-def plot_umap(show_multi=True,title=''):
-    X = np.load(f"{DATA_DIR}/transformed_publicHPA.npz", allow_pickle=True)['feats']
-    sub_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')[:500000]
     num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
     fig, ax = plt.subplots(figsize=(32, 16))
     for i in range(num_classes):
@@ -298,26 +377,67 @@ def plot_umap(show_multi=True,title=''):
         idx = np.where(sub_df['target']==label)[0]
         x = X[idx, 0]
         y = X[idx, 1]
+        #print(label, sub_df['Label'][idx])
         plt.scatter(x, y, c=COLORS[i],label=LABEL_TO_ALIAS[i], s=16)
 
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
     ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
     plt.title(title, fontsize=24)
-    plt.savefig(f"{DATA_DIR}/{title}.png")
-
+    plt.savefig(f"/home/trangle/HPA_SingleCellClassification/plots/umap/{title}.png")
+    
     sub_df["x"] = [idx[0] for idx in X]
     sub_df["y"] = [idx[1] for idx in X]
     sub_df["id"] = ["_".join([img,str(cell)]) for img, cell in zip(sub_df.ID, sub_df.maskid)]
     sub_df.to_csv(f"{DATA_DIR}/{title}.csv", index=False)
-
+    return sub_df
+#%%
 def main():
     #prepare_train_features()
-    #prepare_meta_publicHPA()
+    prepare_meta_publicHPA()
     #fit_umap()
-    transform_umap()
-    plot_umap(show_multi=True,title='publicHPA_multilocalization')
+    #fit_transform_plot()
+    #transform_umap()
+    #plot_umap(show_multi=True,title='publicHPA_multilocalization')
     
+    # Load train features:
+    DATASET='train'
+    file_name = f'cell_features_{DATASET}_default_cell_v1_train.npz'
+    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name}'
+    train_features = np.load(features_file, allow_pickle=True)['feats']
+    print("train_features loaded with shape ", train_features.shape)
+    train_df = pd.read_csv(f'/home/trangle/HPA_SingleCellClassification/hpa2021_0902/data/inputs/cellv4b_{DATASET}_subsettrain.csv')
+    
+    # Load publicHPA features
+    file_name_publicHPA = 'cell_features_test_default_cell_v1.npz'
+    features_file = f'{FEATURE_DIR}/{MODEL_NAME}/fold0/epoch_12.00_ema/{file_name_publicHPA}'
+    features_publicHPA_0 = np.load(features_file, allow_pickle=True)['feats']
+    print("publicHPA_features loaded with shape ", features_publicHPA_0.shape)
+    #public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction.csv')
+    public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
+    #public_hpa_df0 = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
+    
+    #label_df = train_df.groupby('target').head(3000)
+    #feature_matrix = train_features[label_df.index]
+    
+    label_df = public_hpa_df.groupby('target').head(10000)
+    feature_matrix =  features_publicHPA_0[label_df.index]
+    label_df = public_hpa_df[:10000]
+    feature_matrix =  features_publicHPA_0[:10000]
+    
+    
+    """ Performing PCA
+    
+    pca = PCA(n_components=10)
+    feature_matrix = preprocessing.scale(feature_matrix)
+    feature_matrix = pca.fit_transform(feature_matrix)
+    pca.explained_variance_ratio_
+    """
+    
+    show_features_fit_transform(feature_matrix, label_df, show_multi=True, title='multi-location_publicHPAhead10000_eucledian')
+    label_df = public_hpa_df.groupby('target').head(100000)
+    feature_matrix =  features_publicHPA_0[label_df.index]
+    show_features_fit_transform(feature_matrix, label_df, show_multi=True, title='multi-location_publicHPAhead100000_eucledian')
 
 if __name__ == '__main__':
     main()
