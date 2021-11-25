@@ -8,9 +8,10 @@ import os, sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from kaggle_meta_utils import *
+#from kaggle_meta_utils import *
 from datetime import datetime
 import seaborn as sns
+from itertools import accumulate
 
 KAGGLE_META = "/data/kaggle-dataset/kaggle_meta_archive/"
 COMPETITION_ID = 23823
@@ -26,6 +27,7 @@ def filter_submissions_hpa():
     teams = pd.read_csv(os.path.join(KAGGLE_META,'Teams.csv'))
     teams = teams[teams.CompetitionId == COMPETITION_ID]
     submissions_hpa = submissions[submissions.TeamId.isin(teams.Id)]
+    submissions_hpa = submissions_hpa=submissions.merge(teams, how='inner', left_on='TeamId', right_on='Id')
     #submissions_hpa = submissions_hpa[~submissions_hpa.PublicScoreLeaderboardDisplay.isna()]
     submissions_hpa["DiffDate"] = [days_from_start(d) for d in submissions_hpa.SubmissionDate]
     submissions_hpa = submissions_hpa[submissions_hpa.DiffDate>=0]
@@ -38,11 +40,14 @@ def filter_submissions_hpa():
     submissions_hpa.to_csv("./tmp/submissions_hpa.csv",index=False)
     return submissions_hpa
 
+#%%
+#submissions_hpa = filter_submissions_hpa()
+#submissions_hpa = pd.read_csv("Y:/HPA_SingleCellClassification/tmp/submissions_hpa.csv")
 submissions_hpa = pd.read_csv("./tmp/submissions_hpa.csv")
 n_teams = len(submissions_hpa.TeamId.unique())
-aggregated_performance = submissions_hpa.groupby(['TeamId', 'DiffDate']).agg({
+aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby(['TeamId', 'DiffDate']).agg({
     'PublicScoreLeaderboardDisplay': 'mean',
-    'PrivateScoreLeaderboardDisplay': 'mean'
+    'PrivateScoreLeaderboardDisplay': 'meam'
     }).reset_index()
 
 aggregated_performance.to_csv("./tmp/aggregated_performance.csv")
@@ -72,13 +77,12 @@ p.savefig("./tmp/PublicScoreLeaderboardDisplay_relplot.png")
 plt.close()
 
 ###
-aggregated_performance = submissions_hpa.groupby('DiffDate').agg({
+aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby('DiffDate').agg({
     'PublicScoreLeaderboardDisplay': 'mean',
     'PrivateScoreLeaderboardDisplay': 'mean'
     }).reset_index()
 aggregated_performance = aggregated_performance.melt('DiffDate')
-
-splot = sns.lineplot(data=aggregated_performance, 
+splot = sns.relplot(data=aggregated_performance, 
     x="DiffDate", 
     y="value", 
     hue="variable")
@@ -88,5 +92,49 @@ sfig = splot.get_figure()
 sfig.savefig("./tmp/LeaderboardDisplay_lineplot.png", orientation="landscape")
 
 ### Divide teams into quantiles
-quantiles = np.range(0.1, 0.9, 0.1)
-Quantiles_teams = np.quantile(submissions_hpa.PublicScoreLeaderboardDisplay, quantiles)
+quantiles = np.arange(0, 1, 0.1)
+Quantiles_teams = np.quantile(submissions_hpa.dropna(subset=['ScoreDate']).PublicScoreLeaderboardDisplay, quantiles)
+
+# Divide teams into top 10, top 100
+# 3D plot of time (Weekly/Monley), scores and freq (n_teams)
+# frequency of n_submissions through times
+
+
+### Plotting max public score so far
+aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby(['TeamId', 'DiffDate'], sort=True).agg({
+    'PublicScoreLeaderboardDisplay': 'max',
+    'PrivateScoreLeaderboardDisplay': 'max'
+    }).reset_index()
+
+tmp = aggregated_performance.groupby("TeamId")['PublicScoreLeaderboardDisplay'].apply(lambda d: list(accumulate(d, max))).to_list()
+aggregated_performance['Max_so_far'] = [val for sublist in tmp for val in sublist]
+# Metric change date!!!
+
+splot = sns.lineplot(data=aggregated_performance, 
+    x="DiffDate", 
+    y="Max_so_far", 
+    hue="TeamId")
+splot.set_xlabel("Days during competition", fontsize = 20)
+splot.set_ylabel("Public mAP", fontsize = 20)
+sfig = splot.get_figure()
+
+
+### Grouping teams into quantiles/medal ranks
+aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby(['Medal', 'DiffDate'], sort=True).agg({
+    'PublicScoreLeaderboardDisplay': 'mean',
+    'PrivateScoreLeaderboardDisplay': 'mean'
+    }).reset_index()
+
+tmp = aggregated_performance.groupby("Medal")['PublicScoreLeaderboardDisplay'].apply(lambda d: list(accumulate(d, max))).to_list()
+aggregated_performance['Max_so_far'] = [val for sublist in tmp for val in sublist]
+aggregated_performance['Medal'] = aggregated_performance['Medal'].astype('uint8')
+splot = sns.lineplot(data=aggregated_performance, 
+    x="DiffDate", 
+    y="Max_so_far", 
+    hue="Medal")
+splot.set_xlabel("Days during competition", fontsize = 20)
+splot.set_ylabel("Public mAP", fontsize = 20)
+sfig = splot.get_figure()
+sfig.savefig("./tmp/PublicScoreLeaderboardDisplay_mean_MaxScoreProgression_medalgroups.png", orientation="landscape")
+
+plt.scatter(submissions_hpa.PrivateLeaderboardRank, submissions_hpa.PublicLeaderboardRank)
