@@ -189,6 +189,8 @@ def prepare_meta_publicHPA():
     il_labels = tmp[[l+'_y' for l in LABEL_ALIASE_LIST]].values
     sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
     sc_labels = np.array([c/c.max() for c in sc_labels])
+    # sc_labels = list(map(lambda row: [roundToNearest(c, 0.25) for c in row], sc_labels))
+    #sc_labels = [roundToNearest(c, 0.25) for c in sc_labels]
     sc_labels = pd.DataFrame(np.round(il_labels*sc_labels).astype('uint8'))
     sc_labels.columns = LABEL_ALIASE_LIST
     
@@ -213,9 +215,22 @@ def prepare_meta_publicHPA():
     
     
     # Reorganize cells_publicHPA.csv for correct cell order with features file
+    labels = il_labels
     il_labels = pd.DataFrame(il_labels)
     il_labels.columns = LABEL_ALIASE_LIST
-    ifimages_v20_ = pd.concat([df_c[["ID", "Label", "maskid", 'cellmask', 'ImageWidth', 'ImageHeight', 'target']], il_labels], axis=1)
+     = pd.concat([df_c[["ID", "Label", "maskid", 'cellmask', 'ImageWidth', 'ImageHeight']], il_labels], axis=1)
+
+    single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
+    single_labels = labels[single_label_idx]
+    idx1 = np.where(single_labels==1)
+    single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
+    multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
+    multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
+
+    ifimages_v20_['target'] = 'Negative'
+    ifimages_v20_.loc[single_label_idx, 'target'] = single_labels
+    ifimages_v20_.loc[multi_label_idx, 'target'] = multi_labels
+    ifimages_v20_.target.values_count()
     ifimages_v20_.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv', index=False)
     
     
@@ -361,10 +376,18 @@ def show_features_separate(train_features, features_publicHPA, sub_df, show_mult
 
 def show_features_fit_transform(features, sub_df, umap_args, pca=False, show_multi=True, title=''):
     if pca:
-        pca = PCA(n_components=100)
+        pca_pp = PCA(n_components=100)
         features = preprocessing.scale(features)
-        features = pca.fit_transform(features)
-        print(pca.explained_variance_ratio_)
+        features = pca_pp.fit_transform(features)
+        print(f'Percent of explained variance: {np.cumsum(pca_pp.explained_variance_ratio_)[-1]*100}%')
+        plt.bar(range(1,len(pca_pp.explained_variance_ )+1),pca_pp.explained_variance_ )
+        plt.ylabel('Explained variance')
+        plt.xlabel('Components')
+        plt.plot(range(1,len(pca_pp.explained_variance_ )+1),
+                 np.cumsum(pca_pp.explained_variance_),
+                 c='red',
+                 label="Cumulative Explained Variance")
+        plt.legend(loc='upper left')
     else:
         features = preprocessing.scale(features, axis=0)
     reducer = umap.UMAP(
@@ -388,7 +411,7 @@ def show_features_fit_transform(features, sub_df, umap_args, pca=False, show_mul
 
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
-    ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1)
+    ax.legend(loc='upper right', fontsize=24, bbox_to_anchor=(1.24, 1.01), ncol=1, markerscale=6)
     plt.title(title, fontsize=24)
     plt.savefig(f"/home/trangle/HPA_SingleCellClassification/plots/umap/{title}.png")
     
@@ -424,12 +447,24 @@ def main():
     features_publicHPA_0 = np.load(features_file, allow_pickle=True)['feats']
     print("publicHPA_features loaded with shape ", features_publicHPA_0.shape)
     public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction.csv')
-    #public_hpa_df = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
-    #public_hpa_df0 = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
+    public_hpa_df0 = pd.read_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv')
     
     #label_df = train_df.groupby('target').head(3000)
     #feature_matrix = train_features[label_df.index]
     
+    label_df = public_hpa_df.groupby('target').head(10000)
+    feature_matrix =  features_publicHPA_0[label_df.index]  
+    args = dict({
+        'n_neighbors':15, 
+        'min_dist':0.1, 
+        'n_components':2, 
+        'metric':'euclidean'
+    })
+    plottile = f'ml_pHPA10000_15_0.1_euclidean_2d_il*sc'
+    show_features_fit_transform(feature_matrix, label_df, args, pca=False, show_multi=True, title=plottile)  
+    plottile = f'sl_pHPA10000_15_0.1_euclidean_2d_il*sc'
+    show_features_fit_transform(feature_matrix, label_df, args, pca=False, show_multi=False, title=plottile)  
+
     label_df = public_hpa_df.groupby('target').head(10000)
     feature_matrix =  features_publicHPA_0[label_df.index]    
     
@@ -443,24 +478,24 @@ def main():
     scanpy
     testg pca with small data
     """
-    for n in [15,30]:
+    for n in [10,20]:
         for d in [0.1,0.25,0.5]:
-            for m in ['euclidean', 'braycurtis','seuclidean']:
+            for m in ['euclidean', 'braycurtis']:
                 args = dict({
                     'n_neighbors':n, 
                     'min_dist':d, 
                     'n_components':2, 
                     'metric':m
                 })
-                plottile = 'sl_pHPA10000_{n}_{d}_{m}_{}_2d'
+                plottile = f'sl_pHPA10000_{n}_{d}_{m}_2d'
                 show_features_fit_transform(feature_matrix, label_df, args, pca=False, show_multi=False, title=plottile)
     
     import gc
     gc.collect()
-    
+    """
     label_df = public_hpa_df.groupby('target').head(100000)
     feature_matrix =  features_publicHPA_0[label_df.index]     
-    for n in [15,30]:
+    for n in [15,20]:
         for d in [0.1,0.5]:
             for m in ['euclidean']:
                 args = dict({
@@ -469,9 +504,32 @@ def main():
                     'n_components':2, 
                     'metric':m
                 })
-    plottile = 'sl_pHPA100000_pca_{n}_{d}_{m}_{}_2d'
+    plottile = f'sl_pHPA100000_pca_{n}_{d}_{m}_2d'
     show_features_fit_transform(feature_matrix, label_df, args, pca=True, show_multi=False, title=plottile)
-
+    """
+    import re
+    ### Prepare data for web app
+    ifimages = pd.read_csv("/data/kaggle-dataset/PUBLICHPA/raw/train.csv")
+    ifimages_v20 = ifimages[ifimages.latest_version == 20.0]
+    ifimages_v20 = add_label_idx(ifimages_v20, all_locations)
+    ifimages_v20["ID"] = [os.path.basename(f)[:-1] for f in ifimages_v20.filename]
+    ifimages_v20.to_csv("/data/kaggle-dataset/publicHPA_umap/ifimages_v20.csv", index=False)
+    result_df = pd.read_csv(f"{DATA_DIR}/sl_pHPA10000_15_0.1_braycurtis_pca100_3d.csv")
+    
+    tmp = result_df.merge(ifimages_v20, how='left', on=['ID', 'Label'])
+    tmp["Ab"] = [str(int(re.findall("\d+", t)[0])) for t in tmp.antibody]
+    tmp["id"] = tmp["Ab"] + "_" + tmp["id"]
+    
+    LABEL_ALIASE_LIST = [LABEL_TO_ALIAS[i] for i in range(NUM_CLASSES)]
+    tmp["location_code"] = [LABEL_ALIASE_LIST.index(l) for l in tmp.target]
+    tmp = tmp[["x","y","id","location_code","locations","gene_names","ensembl_ids","atlas_name","cellmask","ImageWidth", "ImageHeight","target"]]
+    tmp.to_csv(f"{DATA_DIR}/sl_pHPA10000_15_0.1_braycurtis_pca100_3d_webapp.csv", index=False)    
+    tmp[:100000].to_csv(f"{DATA_DIR}/sl_pHPA10000_15_0.1_braycurtis_pca100_3d_webapp_100k.csv", index=False)    
+    
+    
+def get_numbers(string):
+    num = [int(s) for s in string if s.isdigit()]
+    return 
 
 if __name__ == '__main__':
     main()
