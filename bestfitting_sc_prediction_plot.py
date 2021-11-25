@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from skimage.measure import regionprops#, regionprops_table
 import imageio
-import seaborn as sns
 import utils
 
 BASE_DIR = "/home/trangle/HPA_SingleCellClassification/hpa2021_0902"
@@ -76,9 +75,9 @@ if PLOT_CONF:
         plt.title(LABEL_TO_NAME[v])
         plt.savefig(os.path.join(SAVE_DIR,f"confidence_by_bestfittinghpasc_for_PUBLICHPA_{k}.png"))
         plt.close()
+#Cut off at 90th or 95th percentile for each class
 
-
-for im in imlist[:10]:  
+for im in imlist[200:210]:  
   pcdf = df[df.ID==im]
   pcdf.to_csv(os.path.join(SAVE_DIR,f"predicted_cells_{im}.csv"), index=False)
   #cdf = csv[csv.ID==im]
@@ -107,9 +106,20 @@ for im in imlist[:10]:
           labels= '\n'.join(labels)   
       x = (bbox[0][1] + bbox[0][3])/2
       y = (bbox[0][0] + bbox[0][2])/2
+      ax[1].text(x,y+100, row.maskid, color='white')
       ax[2].text(x,y+100, labels, color='white')
   image_locations = metadata[metadata.Image_ID==im].locations.values[0]
   cell_line = metadata[metadata.Image_ID==im].atlas_name.values[0]
   fig.suptitle(f"{cell_line} : {im} : {image_locations}", fontsize=18,fontweight = 'bold')
   plt.tight_layout()
   plt.savefig(os.path.join(SAVE_DIR,"psc",im+'.jpg'), dpi=600)
+
+
+
+"""
+import numpy as np
+# Load features
+data = np.load(os.path.join(BASE_DIR,"features/d0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds/fold0/epoch_12.00_ema/cell_features_train_default_cell_v1.npz"))
+lst = data.files
+featuresHPA = data[lst[0]]
+"""
