@@ -101,7 +101,7 @@ def generate_dataloader(args):
   print(f'num: {test_dataset.__len__()}')
   return test_loader
 
-def predict_cell_result_augment(args, test_loader, model, augment='default'):
+def predict_cell_result_augment (args, test_loader, model, augment='default'):
   result_ids = []
   result_cell_masks = []
   result_cell_maskids = []
