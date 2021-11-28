@@ -98,8 +98,6 @@
         async setup() {
             const self = this
             this.store = {images: [], selected_table: null, current_filter: '', tables:  {
-                    //"2D": "https://www.dl.dropboxusercontent.com/s/gowglid1sh5dkdv/pHPA10000_15_0.1_euclidean_ilsc_2d.csv",
-                    //"3D": "https://www.dl.dropboxusercontent.com/s/wsklneyh5vah291/pHPA10000_15_0.1_euclidean_ilsc_3d.csv",
                     "2D": "https://www.dl.dropboxusercontent.com/s/8hkdww6b7qpe0ap/pHPA10000_15_0.1_euclidean_ilsc_2d_bbox.csv",
                     "3D": "https://www.dl.dropboxusercontent.com/s/7q7kdridl7tk34a/pHPA10000_15_0.1_euclidean_ilsc_3d_bbox.csv",
                 },
@@ -113,14 +111,15 @@
                 if (this.images.length==0) {
                   return {}
                 }
-                let image = this.images[0]
+                let image = this.images[0].meta
                 let ratio = 2048/400
                 
+                console.log(image)
                 const bbox = {
                   'top': image.top/ratio + 'px',
                   'left': image.left/ratio + 'px',
-                  'width': image.width/ratio + 'px',
-                  'height': image.height/ratio + 'px',
+                  'width': image.height/ratio + 'px',
+                  'height': image.width/ratio + 'px',
                   'border': '4px solid red', 
                   'position':'absolute',
                 }
@@ -174,7 +173,7 @@
                 },
                 async exportCSV(){
                     api.showMessage("Exporting as csv. This may take some time")
-                    let export_string = "ID,X,Y,Z,GENE,LOCATIONS,HPA_URL\n"
+                    let export_string = "ID,X,Y,Z,GENE,SC_LOCATIONS,IL_LOCATIONS,HPA_URL\n"
                     for (var current_index in self.filtered_table) {
                         var current_data = self.filtered_table[current_index]
                         export_string += current_data["id"] + ","
@@ -183,8 +182,9 @@
                         export_string += current_data["z"] + ","
                         export_string += current_data["gene_names"] + ","
                         export_string += "\"" + current_data["location"] + "\","
+                        export_string += "\"" + current_data["locations"] + "\","
                         export_string += current_data["x"] + "," 
-                        export_string += 'https://www.proteinatlas.org/'+current_data["ensembl_ids"]+'-'+current_data["gene_names"]+'/cell/'
+                        export_string += 'https://www.proteinatlas.org/'+current_data["ensembl_ids"]+'-'+current_data["gene_names"]+'/subcellular/'
                         export_string += "\n"
                     }
                     api.exportFile(export_string, 'export.csv')
@@ -193,38 +193,10 @@
                     api.utils.openUrl(url)
                 },
                 openHPA(meta){
-                    const url = 'https://www.proteinatlas.org/'+meta.ensembl_id+'-'+meta.gene_names+'/cell/' 
+                    const url = 'https://www.proteinatlas.org/'+meta.ensembl_ids+'-'+meta.gene_names+'/subcellular/' 
                     api.utils.openUrl(url)
                 },
                 showImage(obj){
-                    //var center = obj.meta.center;
-                    //var width = obj.meta.width;
-                    //var height = obj.meta.height;
-                    //rect(center[0] - width / 2, center[1] - height / 2, width, height);
-                    //read image, add bbox, convert to another url
-                    //read http to canvas and draw a bbox (base64)
-                    var top =  obj.meta.top;
-                    var left = obj.meta.left;
-                    var width = obj.meta.width;
-                    var height = obj.meta.height;
-                    console.log(obj.meta)
-                    console.log(document.styleSheets);
-                    // Find correct DOM element
-                    //document.getElementById('cell-frame').style += `left: ${left}px;`;
-                    /*
-                    var ctx = canvas.getContext('2d');
-                    var img = new Image();
-                    img.src = obj.url;
-                    img.onload = function() {
-                      ctx.drawImage(img, 0, 0);
-                      ctx.beginPath();
-                      ctx.rect(center[0] - width / 2, center[1] - height / 2, width, height);
-                      ctx.lineWidth = 5;
-                      ctx.strokeStyle = 'white';
-                      ctx.stroke();
-                    };
-                    obj.url = canvas.toDataURL();
-                    */
                     this.images.push(obj)
                     if(this.images.length>5){
                         this.images.shift()
@@ -410,7 +382,7 @@
             filter_func = (row)=>{
                 let ret = false
                 for(let filter of filters){
-                    ret = ret || (!filter || row.gene_names === filter || row['ensembl_id'] === filter || row['atlas_name'] === filter || row['id'] === filter || row['location'].includes(filter) )
+                    ret = ret || (!filter || row.gene_names === filter || row['ensembl_ids'] === filter || row['atlas_name'] === filter || row['id'] === filter || row['location'].includes(filter) )
                 }
                 return row.gene_names && ret
             }
@@ -522,7 +494,8 @@
                 <h3>{{images[current_index].meta['gene_names']}} ({{images[current_index].meta['atlas_name']}})</h3>
                 <p>cell line: {{images[current_index].meta['atlas_name']}}</p>
                 <p>gene: {{images[current_index].meta['gene_names']}}</p>
-                <p>location: {{images[current_index].meta['location']}}</p>
+                <p>image location: {{images[current_index].meta['locations']}}</p>
+                <p>cell location: {{images[current_index].meta['location']}}</p>
                 <p>image id: {{ images[current_index].meta.id}} </p>
                 <button class="btn btn-primary" @click="openHPA(images[current_index].meta)">Open HPA page</button> <button class="btn" @click="openImage(images[current_index].url)"><i class="icon icon-share"></i></button>
                 
@@ -541,7 +514,6 @@
                     <!-- carousel item -->
                     <figure class="carousel-item" v-for="(img, i) in images">
                         <img class="img-responsive rounded" :src="img.url" :alt="img.meta.id" @click="openImage(images[current_index].url)">
-                        <!--<div class="cell-frame" style="left: 50%; top: 50%; position: absolute; border: 4px solid red; transform: translate(-50%, -50%); width: 200px; height: 200px"/>-->
                         <div :style="cssVars">
                     </figure>
 
