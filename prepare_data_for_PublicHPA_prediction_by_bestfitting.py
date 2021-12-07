@@ -88,7 +88,7 @@ def main():
     ifimages_v20 = add_label_idx(ifimages_v20, all_locations)
     #ifimages_v20["Labels"] = ["" if str(l) == "nan" else l for l in ifimages_v20.Label]
     ifimages_v20["ID"] = [os.path.basename(f)[:-1] for f in ifimages_v20.filename]
-    ifimages_v20_ = ifimages_v20[["ID","Label"]]
+    ifimages_v20_ = ifimages_v20[["ID","Label","gene_names","ensembl_ids","atlas_name","locations"]]
     ifimages_v20_ = ifimages_v20_[ifimages_v20.Label.isna() == False]
     ifimages_v20_.to_csv(os.path.join(SAVE_DIR.replace("images", "raw"), "train.csv"), index=False)
         
