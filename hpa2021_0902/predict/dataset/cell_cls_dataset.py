@@ -90,7 +90,7 @@ class CellClsDataset(Dataset):
     image = None
     for image_dir in image_dir_list:
       image = cv2.imread(f'{image_dir}/{image_id}.{self.args.suffix}', flags=cv2.IMREAD_UNCHANGED)
-      print('Readimage from:', f'{image_dir}/{image_id}.{self.args.suffix}')
+      #print('Readimage from:', f'{image_dir}/{image_id}.{self.args.suffix}')
       if image is not None:
         break
     return image
