@@ -25,93 +25,93 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
 def initialize_environment(args):
-  seed = 100
-  np.random.seed(seed)
-  torch.manual_seed(seed)
-  torch.cuda.manual_seed(seed)
-  torch.cuda.manual_seed_all(seed)
+    seed = 100
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
-  # COMMON
-  args.device = 'cuda' if args.gpus else 'cpu'
-  args.can_print = True
-  args.seed = seed
-  args.debug = False
+    # COMMON
+    args.device = 'cuda' if args.gpus else 'cpu'
+    args.can_print = True
+    args.seed = seed
+    args.debug = False
 
-  # MODEL
-  args.scheduler = None
-  args.loss = None
-  args.pretrained = False
+    # MODEL
+    args.scheduler = None
+    args.loss = None
+    args.pretrained = False
 
-  # DATASET
-  args.image_size = args.image_size.split(',')
-  if len(args.image_size) == 1:
-    args.image_size = [int(args.image_size[0]), int(args.image_size[0])]
-  elif len(args.image_size) == 2:
-    args.image_size = [int(args.image_size[0]), int(args.image_size[1])]
-  else:
-    raise ValueError(','.join(args.image_size))
-
-  args.num_workers = 4
-  args.split_type = 'random'
-  args.suffix = 'png'
-  args.augments = args.augments.split(',')
-
-  if args.can_print:
-    if args.gpus:
-      print(f'use gpus: {args.gpus}')
+    # DATASET
+    args.image_size = args.image_size.split(',')
+    if len(args.image_size) == 1:
+        args.image_size = [int(args.image_size[0]), int(args.image_size[0])]
+    elif len(args.image_size) == 2:
+        args.image_size = [int(args.image_size[0]), int(args.image_size[1])]
     else:
-      print(f'use cpu')
-  if args.gpus:
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
-  args.model_fpath = f'{DIR_CFGS.MODEL_DIR}/{args.model_dir}/fold{args.fold}/{args.model_epoch}.pth'
-  args.output_dir = f'{DIR_CFGS.DATA_DIR}/cam_results'
-  args.feature_dir = f'{DIR_CFGS.FEATURE_DIR}/{args.model_dir}/fold{args.fold}/epoch_{args.model_epoch}'
+        raise ValueError(','.join(args.image_size))
 
-  if args.can_print:
-    print(f'output dir: {args.output_dir}')
-    print(f'feature dir: {args.feature_dir}')
-  os.makedirs(args.output_dir, exist_ok=True)
-  os.makedirs(args.feature_dir, exist_ok=True)
-  return args
+    args.num_workers = 4
+    args.split_type = 'random'
+    args.suffix = 'png'
+    args.augments = args.augments.split(',')
+
+    if args.can_print:
+        if args.gpus:
+            print(f'use gpus: {args.gpus}')
+        else:
+            print(f'use cpu')
+    if args.gpus:
+      os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
+    args.model_fpath = f'{DIR_CFGS.MODEL_DIR}/{args.model_dir}/fold{args.fold}/{args.model_epoch}.pth'
+    args.output_dir = f'{DIR_CFGS.DATA_DIR}/cam_results'
+    args.feature_dir = f'{DIR_CFGS.FEATURE_DIR}/{args.model_dir}/fold{args.fold}/epoch_{args.model_epoch}'
+
+    if args.can_print:
+        print(f'output dir: {args.output_dir}')
+        print(f'feature dir: {args.feature_dir}')
+    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.feature_dir, exist_ok=True)
+    return args
 
 def load_model(args):
-  image_size = args.image_size
-  args.image_size = image_size[0]
-  model = import_module(f'net.{args.module}').get_model(args)[0]
-  args.image_size = image_size
-  model = load_pretrained(model, args.model_fpath, strict=True, can_print=args.can_print)
-  model = model.eval().to(args.device)
-  if args.device == 'cuda':
-    model = DataParallel(model)
-  return model
+    image_size = args.image_size
+    args.image_size = image_size[0]
+    model = import_module(f'net.{args.module}').get_model(args)[0]
+    args.image_size = image_size
+    model = load_pretrained(model, args.model_fpath, strict=True, can_print=args.can_print)
+    model = model.eval().to(args.device)
+    if args.device == 'cuda':
+        model = DataParallel(model)
+    return model
 
 def generate_dataloader(args):
-  test_dataset = HPA2021Dataset(
-    args,
-    transform=None,
-    dataset=args.dataset,
-    is_training=False,
-  )
-  test_dataset.set_part(part_start=args.part_start, part_end=args.part_end)
-  _ = test_dataset[0]
-  test_loader = DataLoader(
-    test_dataset,
-    sampler=SequentialSampler(test_dataset),
-    batch_size=1,
-    drop_last=False,
-    num_workers=args.num_workers,
-    pin_memory=False,
-    collate_fn=collate_fn,
-  )
-  print(f'num: {test_dataset.__len__()}')
-  return test_loader
+    test_dataset = HPA2021Dataset(
+      args,
+      transform=None,
+      dataset=args.dataset,
+      is_training=False,
+    )
+    test_dataset.set_part(part_start=args.part_start, part_end=args.part_end)
+    _ = test_dataset[0]
+    test_loader = DataLoader(
+      test_dataset,
+      sampler=SequentialSampler(test_dataset),
+      batch_size=1,
+      drop_last=False,
+      num_workers=args.num_workers,
+      pin_memory=False,
+      collate_fn=collate_fn,
+    )
+    print(f'num: {test_dataset.__len__()}')
+    return test_loader
 
 def generate_cam(args, test_loader, model):
     model = load_model(args) if model is None else model
     #print(model)
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
     target_layers = [model.module.maxpool]
-    cam = GradCAM(model=model.module, target_layers=target_layers, use_cuda=args.device)
+    cam = GradCAM(model=model.module, target_layers=target_layers, use_cuda=('cuda' == args.device))
     
     augment='default' # default == nothing
     for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell {augment}'):
@@ -121,8 +121,10 @@ def generate_cam(args, test_loader, model):
         print("image shape: ", iter_data['image'].shape)
         data = iter_data['image'].to(args.device)
         rgb_img = np.array(data[0][0:3,:,:].cpu()).transpose(1, 2, 0)
+        grayscale_cams = cam(input_tensor=data, aug_smooth=True)
+        print(grayscale_cams.shape)
         for v,k in LABEL_TO_ALIAS.items():
-            grayscale_cam = cam(input_tensor=data, target_category=v, aug_smooth=True)
+            grayscale_cam = grayscale_cams[v,:]
             visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
             cv2.imwrite(f'{args.output_dir}/{iter_data.ID}_{k}.png', visualization)
 
