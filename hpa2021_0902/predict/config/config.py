@@ -13,7 +13,7 @@ DIR_CFGS = Namespace()
 DIR_CFGS.RESULT_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/result'
 DIR_CFGS.MODEL_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/models'
 DIR_CFGS.FEATURE_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/features'
-DIR_CFGS.DATA_DIR       = '/data/kaggle-dataset/PUBLICHPA'
+DIR_CFGS.DATA_DIR       = '/data/kaggle-dataset/CAM_images'
 DIR_CFGS.PRETRAINED_DIR = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/pretrained'
 
 NUC_MODEL = f'{DIR_CFGS.PRETRAINED_DIR}/nuclei_model.pth'
