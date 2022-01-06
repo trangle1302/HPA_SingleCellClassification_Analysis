@@ -23,6 +23,7 @@ cudnn.benchmark = True
 import cv2
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 def initialize_environment(args):
     seed = 100
@@ -81,8 +82,6 @@ def load_model(args):
     args.image_size = image_size
     model = load_pretrained(model, args.model_fpath, strict=True, can_print=args.can_print)
     model = model.eval().to(args.device)
-    #if args.device == 'cuda':
-    #    model = DataParallel(model)
     return model
 
 def generate_dataloader(args):
@@ -108,25 +107,25 @@ def generate_dataloader(args):
 
 def generate_cam(args, test_loader, model):
     model = load_model(args) if model is None else model
-    #print(model.backbone.layer0)
+    print(model.fc_layers[-2],model.fc_layers[-4])
+    print(model.backbone.layer4[-1])
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
-    target_layers = [model.maxpool] #model.fc_layers[-1] or model.backbone.layer4(x)
+    target_layers = [model.backbone.layer4[-1]] #[model.fc_layers[-2]] #
     cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
     
     augment='default' # default == nothing
     for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell {augment}'):
-        #iter_data['image'] = Variable(iter_data['image'].to(args.device))
-        #data = {'image': iter_data['image']}
-
         inp = iter_data['image'].to(args.device)
-        rgb_img = np.array(inp[0][0:3,:,:].cpu()).transpose(1, 2, 0)
-        print(f"{iter_data['ID']} shape: {inp.shape}; rgb shape: {rgb_img.shape}")
-        grayscale_cams = cam(input_tensor=inp, aug_smooth=True)
-        print(grayscale_cams.shape)
+        rgb_img = np.array(iter_data['image'][0][0:3,:,:]*255).astype(np.uint8).transpose(1, 2, 0)
+        # channels:['red', 'green', 'blue', 'yellow'] or MT, protein, nu, ER
+        # cv2 is in format BGR
+        bgr_img = rgb_img[...,[2,1,0]]
+        cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}.png", bgr_img)
         for v,k in LABEL_TO_ALIAS.items():
-            grayscale_cam = grayscale_cams[v,:]
-            visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
-            cv2.imwrite(f"{args.output_dir}/{iter_data['ID']}_{k}.png", visualization)
+            grayscale_cam = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v)], aug_smooth=True)
+            print(grayscale_cam.max())
+            visualization = show_cam_on_image(bgr_img/255, grayscale_cam[0], use_rgb=False)
+            cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{k}.png", visualization)
 
 def main(args):
     start_time = timer()
