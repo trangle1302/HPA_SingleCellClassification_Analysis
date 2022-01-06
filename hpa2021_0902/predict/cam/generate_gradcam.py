@@ -81,8 +81,8 @@ def load_model(args):
     args.image_size = image_size
     model = load_pretrained(model, args.model_fpath, strict=True, can_print=args.can_print)
     model = model.eval().to(args.device)
-    if args.device == 'cuda':
-        model = DataParallel(model)
+    #if args.device == 'cuda':
+    #    model = DataParallel(model)
     return model
 
 def generate_dataloader(args):
@@ -108,25 +108,25 @@ def generate_dataloader(args):
 
 def generate_cam(args, test_loader, model):
     model = load_model(args) if model is None else model
-    #print(model)
+    #print(model.backbone.layer0)
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
-    target_layers = [model.module.maxpool]
-    cam = GradCAM(model=model.module, target_layers=target_layers, use_cuda=('cuda' == args.device))
+    target_layers = [model.maxpool] #model.fc_layers[-1] or model.backbone.layer4(x)
+    cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
     
     augment='default' # default == nothing
     for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell {augment}'):
         #iter_data['image'] = Variable(iter_data['image'].to(args.device))
         #data = {'image': iter_data['image']}
 
-        print("image shape: ", iter_data['image'].shape)
-        data = iter_data['image'].to(args.device)
-        rgb_img = np.array(data[0][0:3,:,:].cpu()).transpose(1, 2, 0)
-        grayscale_cams = cam(input_tensor=data, aug_smooth=True)
+        inp = iter_data['image'].to(args.device)
+        rgb_img = np.array(inp[0][0:3,:,:].cpu()).transpose(1, 2, 0)
+        print(f"{iter_data['ID']} shape: {inp.shape}; rgb shape: {rgb_img.shape}")
+        grayscale_cams = cam(input_tensor=inp, aug_smooth=True)
         print(grayscale_cams.shape)
         for v,k in LABEL_TO_ALIAS.items():
             grayscale_cam = grayscale_cams[v,:]
             visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
-            cv2.imwrite(f'{args.output_dir}/{iter_data.ID}_{k}.png', visualization)
+            cv2.imwrite(f"{args.output_dir}/{iter_data['ID']}_{k}.png", visualization)
 
 def main(args):
     start_time = timer()
