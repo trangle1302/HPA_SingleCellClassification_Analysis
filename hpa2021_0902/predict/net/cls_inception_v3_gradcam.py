@@ -115,11 +115,10 @@ class InceptionV3(nn.Module):
     x = self.fc_layers(x)
 
     logits = self.logit(x)
-    print(logits)
     if self.do_ml:
       ml_logits = self.ml_logit(x)
       logits = ml_logits
-    return logits[0]
+    return logits
 
 def cls_inception_v3_cbam(args):
   model = InceptionV3(args, feature_net='inception_v3', att_type='cbam')
