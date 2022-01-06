@@ -47,7 +47,7 @@ submissions_hpa = pd.read_csv("./tmp/submissions_hpa.csv")
 n_teams = len(submissions_hpa.TeamId.unique())
 aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby(['TeamId', 'DiffDate']).agg({
     'PublicScoreLeaderboardDisplay': 'mean',
-    'PrivateScoreLeaderboardDisplay': 'meam'
+    'PrivateScoreLeaderboardDisplay': 'mean'
     }).reset_index()
 
 aggregated_performance.to_csv("./tmp/aggregated_performance.csv")
@@ -120,6 +120,8 @@ sfig = splot.get_figure()
 
 
 ### Grouping teams into quantiles/medal ranks
+palette = dict(zip(aggregated_performance.Medal.unique(),
+                   sns.color_palette("rocket_r", 3)))
 aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby(['Medal', 'DiffDate'], sort=True).agg({
     'PublicScoreLeaderboardDisplay': 'mean',
     'PrivateScoreLeaderboardDisplay': 'mean'
@@ -131,7 +133,8 @@ aggregated_performance['Medal'] = aggregated_performance['Medal'].astype('uint8'
 splot = sns.lineplot(data=aggregated_performance, 
     x="DiffDate", 
     y="Max_so_far", 
-    hue="Medal")
+    hue="Medal",
+    palette=palette)
 splot.set_xlabel("Days during competition", fontsize = 20)
 splot.set_ylabel("Public mAP", fontsize = 20)
 sfig = splot.get_figure()

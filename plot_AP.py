@@ -74,7 +74,7 @@ df.ShortLabelName = pd.Categorical(df.ShortLabelName,
 colorvector = [COLORS[mapping[n]] for n in order]
 g = ggplot(df, aes(x="ShortLabelName", y="AP", fill="ShortLabelName"))
 g = g + geom_violin() + theme_classic() + theme(axis_text_x = element_text(angle=90, hjust=1)) + geom_point()+ scale_fill_manual(values=list(colorvector))
-g.save(os.path.join(save_dir, "plots","AP_per_class2.jpg"), dpi=600)
+g.save(os.path.join(save_dir, "plots","AP_per_class2.png"), dpi=600)
 
 
 ### AP vs sample counts
