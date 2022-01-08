@@ -65,7 +65,7 @@ def initialize_environment(args):
     if args.gpus:
       os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
     args.model_fpath = f'{DIR_CFGS.MODEL_DIR}/{args.model_dir}/fold{args.fold}/{args.model_epoch}.pth'
-    args.output_dir = f'{DIR_CFGS.DATA_DIR}/cam_results'
+    args.output_dir = f'{DIR_CFGS.DATA_DIR}/1st_cams'
     args.feature_dir = f'{DIR_CFGS.FEATURE_DIR}/{args.model_dir}/fold{args.fold}/epoch_{args.model_epoch}'
 
     if args.can_print:
@@ -125,9 +125,8 @@ def generate_cam(args, test_loader, model):
         cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}.png", bgr_img)
         for v,k in LABEL_TO_ALIAS.items():
             grayscale_cam = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v)], aug_smooth=True)
-            print(grayscale_cam.max())
             visualization = show_cam_on_image(bgr_img/255, grayscale_cam[0], use_rgb=False)
-            cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{k}.png", visualization)
+            cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['index'][0]}_{k}.png", visualization)
 
 def main(args):
     start_time = timer()
