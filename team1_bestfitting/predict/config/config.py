@@ -10,11 +10,11 @@ from argparse import Namespace
 sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 hostname = socket.gethostname()
 DIR_CFGS = Namespace()
-DIR_CFGS.RESULT_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/result'
-DIR_CFGS.MODEL_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/models'
-DIR_CFGS.FEATURE_DIR     = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/features'
+DIR_CFGS.RESULT_DIR     = '/home/trangle/HPA_SingleCellClassification/team1_bestfitting/result'
+DIR_CFGS.MODEL_DIR     = '/home/trangle/HPA_SingleCellClassification/team1_bestfitting/models'
+DIR_CFGS.FEATURE_DIR     = '/home/trangle/HPA_SingleCellClassification/team1_bestfitting/features'
 DIR_CFGS.DATA_DIR       = '/data/kaggle-dataset/CAM_images'
-DIR_CFGS.PRETRAINED_DIR = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/pretrained'
+DIR_CFGS.PRETRAINED_DIR = '/home/trangle/HPA_SingleCellClassification/team1_bestfitting/pretrained'
 
 NUC_MODEL = f'{DIR_CFGS.PRETRAINED_DIR}/nuclei_model.pth'
 CELL_MODEL = f'{DIR_CFGS.PRETRAINED_DIR}/cell_model.pth'
