@@ -41,15 +41,20 @@ def main():
             #print(f"{IMAGE_DIR}/{img_name}_*.png",img_path)
             location = img_path.split("_")[-1].replace(".png", "")
             img = imageio.imread(img_path)
-            mask = cv2.resize(mask, (512,512))
+            img = cv2.resize(img, (2048,2048))
             #print(f"Mask shape: {mask.shape}, Image shape: {img.shape}")
             regions = regionprops(mask)
             for region in regions:
-                bbox = region.bbox
-                #print(bbox, mask.shape, img.shape)
+                bbox_ = region.bbox
                 cell_id = region.label
-                cell = img[bbox[0]:bbox[2],bbox[1]:bbox[3],:]
-                cell = cv2.resize(cell, (128,128))
+                cell = img[bbox_[0]:bbox_[2],bbox_[1]:bbox_[3],:]
+                """
+                #cell = cv2.resize(cell, (128,128))
+                plt.figure()
+                plt.imshow(cell)
+                plt.imshow(mask[bbox_[0]:bbox_[2],bbox_[1]:bbox_[3]]==cell_id, alpha=0.3)
+                break
+                """
                 imageio.imwrite(f"{SAVE_DIR}/{img_name}_{cell_id}_{location}.png", cell)
 
 if __name__ == '__main__':
