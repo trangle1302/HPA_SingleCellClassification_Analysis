@@ -109,10 +109,10 @@ def generate_cam(args, test_loader, model):
     model = load_model(args) if model is None else model
     #
     print(model)
-    print(model.fc_layers[2],model.fc_layers[4])
-    print(model.backbone.layer4[-1])
+    #print(model.fc_layers[2],model.fc_layers[4])
+    print(model.att_module)
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
-    target_layers = [model.backbone.layer4[-1]] #[model.fc_layers[-2]] #
+    target_layers = [model.maxpool] #[model.backbone.layer4[-1]] #[model.fc_layers[-2]] #
     cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
     
     augment='default' # default == nothing
