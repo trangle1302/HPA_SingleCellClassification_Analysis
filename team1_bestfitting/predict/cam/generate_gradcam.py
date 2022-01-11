@@ -107,16 +107,20 @@ def generate_dataloader(args):
 
 def generate_cam(args, test_loader, model):
     model = load_model(args) if model is None else model
-    #
-    print(model)
     #print(model.fc_layers[2],model.fc_layers[4])
-    print(model.att_module)
+    print(model.backbone.layer4[-1])
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
-    target_layers = [model.maxpool] #[model.backbone.layer4[-1]] #[model.fc_layers[-2]] #
+    target_layers = [model.backbone.layer4[-1]] #[model.fc_layers[-2]] #[model.att_module.conv_after_concat] #
     cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
     
     augment='default' # default == nothing
     for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell {augment}'):
+        outputs = model(Variable(iter_data['image'].to(args.device)))
+        logits = outputs
+        probs = torch.sigmoid(logits)
+        probs = probs.to('cpu').detach().numpy()
+        print(probs)
+
         inp = iter_data['image'].to(args.device)
         rgb_img = np.array(iter_data['image'][0][0:3,:,:]*255).astype(np.uint8).transpose(1, 2, 0)
         # channels:['red', 'green', 'blue', 'yellow'] or MT, protein, nu, ER
@@ -125,6 +129,7 @@ def generate_cam(args, test_loader, model):
         cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}.png", bgr_img)
         for v,k in LABEL_TO_ALIAS.items():
             grayscale_cam = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v)], aug_smooth=True)
+            print(grayscale_cam.max())
             visualization = show_cam_on_image(bgr_img/255, grayscale_cam[0], use_rgb=False)
             cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['index'][0]}_{k}.png", visualization)
 
