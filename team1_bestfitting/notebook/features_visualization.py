@@ -25,8 +25,8 @@ ope = os.path.exists
 opj = os.path.join
 
 #%%
-FEATURE_DIR    = 'hpa2021_0902/features'
-DATA_DIR       = 'hpa2021_0902/data'
+FEATURE_DIR    = './team1_bestfitting/features'
+DATA_DIR       = './team1_bestfitting/data'
 
 ID             = 'ID'
 LABEL          = 'Label'
