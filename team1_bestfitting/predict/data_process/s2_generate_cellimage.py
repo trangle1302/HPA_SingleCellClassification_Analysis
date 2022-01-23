@@ -57,7 +57,8 @@ def main(args):
   if args.split_df is not None:
     df = args.split_df.copy()
   elif args.dataset == 'test':
-    df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/sample_submission.csv')
+    #df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/sample_submission.csv')
+    df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/test.csv')
   else:
     df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/inputs/{args.dataset}.csv')
 

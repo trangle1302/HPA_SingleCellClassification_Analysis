@@ -56,6 +56,11 @@ def load_train_data():
   print(data_df.head(), sum(data_df.Label.isna()))
   return data_df
 
+def load_test_data():
+  data_df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/test.csv')
+  print(data_df.head(), sum(data_df.Label.isna()))
+  return data_df
+
 def generate_inputs(output_dir, pool, dataset='train'):
   data_df = eval(f'load_{dataset}_data')()
   for col in ALIASES: data_df[col] = 0
@@ -104,7 +109,8 @@ def generate_cellmask_csv(dataset, pool):
 
   cell_mask_fnames = glob.glob(f'{mask_dir}/*_cellmask.png')
   if dataset == 'test':
-    df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/sample_submission.csv')
+    #df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/sample_submission.csv')
+    df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/test.csv')
   else:
     df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/inputs/{dataset}.csv')
   img_ids = df[ID].unique()
@@ -163,7 +169,7 @@ def main(args, split_df=None, mask_output_dir=None):
   pool = SuperPool(n_cpu=24)
   output_dir = f'{DIR_CFGS.DATA_DIR}/inputs'
   generate_inputs(output_dir, pool, dataset=args.dataset)
-  generate_cellmask(args, split_df, mask_output_dir)
+  #generate_cellmask(args, split_df, mask_output_dir)
   generate_cellmask_csv(dataset=args.dataset, pool=pool)
 
 if __name__ == '__main__':
