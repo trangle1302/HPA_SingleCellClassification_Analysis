@@ -65,7 +65,7 @@ def initialize_environment(args):
     if args.gpus:
       os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
     args.model_fpath = f'{DIR_CFGS.MODEL_DIR}/{args.model_dir}/fold{args.fold}/{args.model_epoch}.pth'
-    args.output_dir = f'{DIR_CFGS.DATA_DIR}/1st_cams'
+    args.output_dir = f'{DIR_CFGS.DATA_DIR}/1st_cams/tmp'
     args.feature_dir = f'{DIR_CFGS.FEATURE_DIR}/{args.model_dir}/fold{args.fold}/epoch_{args.model_epoch}'
 
     if args.can_print:
@@ -110,17 +110,17 @@ def generate_cam(args, test_loader, model):
     #print(model.fc_layers[2],model.fc_layers[4])
     print(model.backbone.layer4[-1])
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
-    target_layers = [model.backbone.layer4[-1]] #[model.fc_layers[-2]] #[model.att_module.conv_after_concat] #
+    target_layers = [model.backbone.layer4[-1]]#[model.att_module.conv_after_concat] #[model.backbone.layer4[-1]] #[model.fc_layers[-2]] 
     cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
     
+    resutls = []
     augment='default' # default == nothing
     for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell {augment}'):
         outputs = model(Variable(iter_data['image'].to(args.device)))
         logits = outputs
         probs = torch.sigmoid(logits)
-        probs = probs.to('cpu').detach().numpy()
-        print(probs)
-
+        probs = probs.to('cpu').detach().numpy()[0]
+        top3 = np.argsort(probs)
         inp = iter_data['image'].to(args.device)
         rgb_img = np.array(iter_data['image'][0][0:3,:,:]*255).astype(np.uint8).transpose(1, 2, 0)
         # channels:['red', 'green', 'blue', 'yellow'] or MT, protein, nu, ER
@@ -128,10 +128,18 @@ def generate_cam(args, test_loader, model):
         bgr_img = rgb_img[...,[2,1,0]]
         cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}.png", bgr_img)
         for v,k in LABEL_TO_ALIAS.items():
+            prob = np.round(probs[v],2)
             grayscale_cam = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v)], aug_smooth=True)
-            print(grayscale_cam.max())
-            visualization = show_cam_on_image(bgr_img/255, grayscale_cam[0], use_rgb=False)
-            cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['index'][0]}_{k}.png", visualization)
+
+            if v in top3:
+                print(prob,grayscale_cam.mean(),grayscale_cam.max())
+            #if prob > 0.3:
+                visualization = show_cam_on_image(bgr_img/255, grayscale_cam[0], use_rgb=False)
+                sidebyside = np.r_[bgr_img,visualization]
+                cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['index'][0]}_{k}_{prob:.2f}.png", sidebyside)
+            resutls.append((iter_data['ID'][0], iter_data['index'][0], k, probs[v], grayscale_cam.mean(), grayscale_cam.max()))
+    resutls = pd.DataFrame(resutls, columns=["image_id", "cell_id", "Label", "prob", "cam_mean", "cam_max"])
+    resutls.to_csv(f"{args.output_dir}/result_df.png", index=False)
 
 def main(args):
     start_time = timer()
