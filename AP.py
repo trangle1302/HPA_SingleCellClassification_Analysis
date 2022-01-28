@@ -19,7 +19,7 @@ def average_precisions(y_true, y_pred):
         fp = np.cumsum(fp)
         tp = np.cumsum(tp)
 
-        npos = numpy.sum(y_true_cls)
+        npos = np.sum(y_true_cls)
 
         rec = tp * 1.0 / npos
 
