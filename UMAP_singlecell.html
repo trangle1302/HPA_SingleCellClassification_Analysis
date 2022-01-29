@@ -99,25 +99,25 @@
             const self = this
             this.store = {images: [], selected_table: null, current_filter: '', tables:  {
                     "2D": "https://www.dl.dropboxusercontent.com/s/bw6ymsxqs94z7zx/pHPA10000_15_0.1_euclidean_ilsc_2d_bbox.csv",
-                    //"3D": "https://www.dl.dropboxusercontent.com/s/2dnmvxehmhlkhuz/pHPA10000_15_0.1_euclidean_ilsc_3d_bbox.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/i1knq78dksjprdc/ActinF.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/27zoi7q5s3u2rkum/Aggresome.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/d5lg8nlcle5awr1/Centrosome.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/7e0td4e7407ytc8/Cytosol.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/1ghhkjuuiic4fn3/EndoplasmicR.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/q56yx11qny164g9/GolgiA.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/unzrf263cnpy3v5/IntermediateF.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/vi5a2t1lthsvqt6/Microtubules.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/k063q65xc0q8r49/Mitochondria.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/g5tnohptjejem12/MitoticS.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/t0pu8q1aya56ohw/MultiLocation.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/yiiu8j0bw4c70dh/Negative.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/0bwg4x7bq2cu99b/NuclearB.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/uywones9yzwk1z4/NuclearM.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/1i6r6y4h8rtx4l8/NuclearS.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/e1sc5b3k4pxx3wp/Nucleoli.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/tyuod28e6um3nqm/NucleoliFC.csv",
-                    "3D": "https://www.dl.dropboxusercontent.com/s/o9ee76l7wprwjq6/Nucleoplasm.csv",
+                    "3D": "https://www.dl.dropboxusercontent.com/s/2dnmvxehmhlkhuz/pHPA10000_15_0.1_euclidean_ilsc_3d_bbox.csv",
+                    "Actin": "https://www.dl.dropboxusercontent.com/s/i1knq78dksjprdc/ActinF.csv",
+                    "Aggresome": "https://www.dl.dropboxusercontent.com/s/7zoi7q5s3u2rkum/Aggresome.csv",
+                    "Centrosome": "https://www.dl.dropboxusercontent.com/s/d5lg8nlcle5awr1/Centrosome.csv",
+                    "Cytosol": "https://www.dl.dropboxusercontent.com/s/7e0td4e7407ytc8/Cytosol.csv",
+                    "ER": "https://www.dl.dropboxusercontent.com/s/1ghhkjuuiic4fn3/EndoplasmicR.csv",
+                    "Golgi": "https://www.dl.dropboxusercontent.com/s/q56yx11qny164g9/GolgiA.csv",
+                    "IntF": "https://www.dl.dropboxusercontent.com/s/unzrf263cnpy3v5/IntermediateF.csv",
+                    "MT": "https://www.dl.dropboxusercontent.com/s/vi5a2t1lthsvqt6/Microtubules.csv",
+                    "Mitochondria": "https://www.dl.dropboxusercontent.com/s/k063q65xc0q8r49/Mitochondria.csv",
+                    "MSpindle": "https://www.dl.dropboxusercontent.com/s/g5tnohptjejem12/MitoticS.csv",
+                    "multi": "https://www.dl.dropboxusercontent.com/s/t0pu8q1aya56ohw/MultiLocation.csv",
+                    "Neg": "https://www.dl.dropboxusercontent.com/s/yiiu8j0bw4c70dh/Negative.csv",
+                    "NuB": "https://www.dl.dropboxusercontent.com/s/0bwg4x7bq2cu99b/NuclearB.csv",
+                    "NuM": "https://www.dl.dropboxusercontent.com/s/uywones9yzwk1z4/NuclearM.csv",
+                    "NuS": "https://www.dl.dropboxusercontent.com/s/1i6r6y4h8rtx4l8/NuclearS.csv",
+                    "Nucleoli": "https://www.dl.dropboxusercontent.com/s/e1sc5b3k4pxx3wp/Nucleoli.csv",
+                    "NuFC": "https://www.dl.dropboxusercontent.com/s/tyuod28e6um3nqm/NucleoliFC.csv",
+                    "Nucleoplasm": "https://www.dl.dropboxusercontent.com/s/o9ee76l7wprwjq6/Nucleoplasm.csv",
                 },
                 current_index: 0, loading: true, thumbnail: null, search_text: 'COVID-19'}
             this.app = new Vue({
@@ -259,16 +259,6 @@
                 {
             buttons: [
                 {
-                    args: [{'marker.size': 16}],
-                    label:'marker size: 16',
-                    method:'restyle'
-                },
-                {
-                    args: [{'marker.size': 8}],
-                    label:'marker size: 8',
-                    method:'restyle'
-                },
-                {
                     args: [{'marker.size': 4}],
                     label:'marker size: 4',
                     method:'restyle'
@@ -297,7 +287,7 @@
         
         const layout = {
             hovermode:'closest',
-            title:'HPAv20 UMAP (model:inceptionv4, images: '+data[0].x.length+')', 
+            title:'HPAv20 UMAP (model:inceptionv3, images: '+data[0].x.length+')', 
             xaxis: {
                 showticklabels: false,
                 nticks: 15,
@@ -469,6 +459,19 @@
                 <div class="btn-group btn-group-block">
                     <button @click="loadTable('2D')" class="btn" :class="{'btn-primary': selected_table==='2D'}">2D</button>
                     <button @click="loadTable('3D')" class="btn" :class="{'btn-primary': selected_table==='3D'}">3D</button>
+                </div> 
+                <div class="dropdown hide-sm">
+                    <a href="#" class="btn btn-link dropdown-toggle" tabindex="0">
+                        <i class="fas fa-folder-plus icon-size-position"></i>
+                        <label class="hide-sm">UMAP class</label>  <i class="icon icon-caret hide-sm"></i>
+                    </a>
+                    <ul class="menu">
+                        <li v-for="url, name in tables" :key="name">
+                            <a href="#" @click="loadTable(url)"  class="btn btn-link">
+                                Load {{name}}
+                            </a>
+                        </li>
+                    </ul>
                 </div> 
                 <div class="dropdown hide-sm">
                     <a href="#" class="btn btn-link dropdown-toggle" tabindex="0">
