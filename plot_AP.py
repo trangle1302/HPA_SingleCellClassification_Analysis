@@ -4,6 +4,7 @@ import json
 #!pip install pandas plotnine
 from plotnine import *
 import os
+import seaborn as sns
 
 def read_from_json(json_file_path):
     """Function to read json file (annotation file)
@@ -28,9 +29,8 @@ def get_location_counts(label_list, all_locations):
             for loc in locations:
                 label_counts[loc] += 1
     return label_counts
-    
-save_dir = "/home/trangle/HPA_SingleCellClassification"
-df = pd.read_excel(os.path.join(save_dir, "Kaggle_AP.xlsx"), sheet_name="Sheet1")
+
+
 mapping = dict({
     "Nucleoplasm": 0,
     "Nuc.Membrane": 1,
@@ -53,7 +53,6 @@ mapping = dict({
     "Negative" : 18
 })
 reverse_mapping = {str(v):k for k,v in mapping.items()}
-df["ShortLabelName"] = [reverse_mapping[str(l)] for l in df.Class]
 
 COLORS = [
     '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
@@ -64,14 +63,70 @@ COLORS = [
     '#00e676', '#64ffda', '#18ffff',
 ]
 
+    
+save_dir = "/home/trangle/HPA_SingleCellClassification"
+df = pd.read_excel(os.path.join(save_dir, "Kaggle_AP.xlsx"), sheet_name="Sheet1")
+df["ShortLabelName"] = [reverse_mapping[str(l)] for l in df.Class]
+
+# Mean and Std of each classes for top 50 teams
+aggregated_performance = df.groupby('LabelName').agg({
+    'AP_public': ['mean','std'],
+    'AP_private': ['mean','std']
+    }).reset_index()
+aggregated_performance.to_csv(f'{save_dir}/Kaggle_AP_mean_std.csv', index=False)
+
+### Label counts of train and test sets
+label_df = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/kaggle_master_training_reindex.csv')
+label_df = label_df[~label_df.locations_reindex.isna()]
+label_counts_train = get_location_counts(label_df.locations_reindex.values.tolist(), mapping)
+
+label_df = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/IF-image_reindex.csv')
+label_df = label_df[label_df.latest_version==19]
+label_df = label_df[~label_df.locations_reindex.isna()]
+label_counts_pHPA = get_location_counts(label_df.locations_reindex.values.tolist(), mapping)
+
+label_df = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/privatetest/labels_privatetest.csv')
+label_counts_private = get_location_counts(label_df.Label.values.tolist(), mapping)
+label_df = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/publictest/labels_publictest.csv')
+label_counts_public = get_location_counts(label_df.Label.values.tolist(), mapping)
+
+# Merge all to label_counts
+label_counts = {'train': label_counts_train, 'pHPA':label_counts_pHPA, 'publictest':label_counts_public, 'privatetest':label_counts_private}
+
+plot_order = [k for k,v in sorted(label_counts_private.items(), key=lambda item: item[1], reverse=True)]
+
+
+label_counts =pd.DataFrame.from_dict(label_counts)
+label_counts["ShortLabelName"] = label_counts.index
+label_counts = pd.melt(label_counts, id_vars=["ShortLabelName"])
+label_counts.ShortLabelName = pd.Categorical(label_counts.ShortLabelName, 
+                             ordered=True,
+                             categories=plot_order)
+label_counts["unit"] = "cell"
+label_counts["unit"][label_counts.variable=="train"] = "image" 
+label_counts["unit"][label_counts.variable=="pHPA"] = "image" 
+
+g = ggplot(label_counts, aes(x="ShortLabelName", y="value", fill="variable"))
+g = g + geom_bar(stat = "identity",position="stack") + facet_grid("unit~.") + theme_classic() + theme(axis_text_x = element_text(angle=90, hjust=1)) + scale_fill_manual(values=["blue","lightgreen","green","orange",])
+g.save(os.path.join(save_dir, "plots","Label_distribution.png"), dpi=600)
+
+
+g = ggplot(label_counts[label_counts.unit == "cell"], aes(x="ShortLabelName", y="value", fill="variable"))
+g = g + geom_bar(stat = "identity",position="stack") + theme_classic() + theme(axis_text_x = element_text(angle=90, hjust=1)) + scale_fill_manual(values=["lightgreen","green",])
+g.save(os.path.join(save_dir, "plots","Label_distribution_cell.png"), dpi=600)
+
+g = ggplot(label_counts[label_counts.unit == "image"], aes(x="ShortLabelName", y="value", fill="variable"))
+g = g + geom_bar(stat = "identity",position="stack") +  theme_classic() + theme(axis_text_x = element_text(angle=90, hjust=1)) + scale_fill_manual(values=["blue","orange",])
+g.save(os.path.join(save_dir, "plots","Label_distribution_image.png"), dpi=600)
 
 ### AP plot
 # Plotting order = mean of each class
-order = df.groupby(["ShortLabelName"]).mean().AP.sort_values(ascending=True).index
+#order = df.groupby(["ShortLabelName"]).mean().AP_private.sort_values(ascending=True).index
 df.ShortLabelName = pd.Categorical(df.ShortLabelName, 
                              ordered=True,
-                             categories=order)
-colorvector = [COLORS[mapping[n]] for n in order]
+                             categories=plot_order)
+
+colorvector = [COLORS[mapping[n]] for n in plot_order]
 g = ggplot(df, aes(x="ShortLabelName", y="AP", fill="ShortLabelName"))
 g = g + geom_violin() + theme_classic() + theme(axis_text_x = element_text(angle=90, hjust=1)) + geom_point()+ scale_fill_manual(values=list(colorvector))
 g.save(os.path.join(save_dir, "plots","AP_per_class2.png"), dpi=600)
