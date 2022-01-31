@@ -27,7 +27,7 @@ ope = os.path.exists
 opj = os.path.join
 
 #%%
-FEATURE_DIR    = '/home/trangle/HPA_SingleCellClassification/hpa2021_0902/features'
+FEATURE_DIR    = '/home/trangle/HPA_SingleCellClassification/team1_bestfitting/features'
 DATA_DIR       = '/data/kaggle-dataset/PUBLICHPA'
 DATASET        = 'train'
 MODEL_NAME     = 'd0507_cellv4b_3labels_cls_inception_v3_cbam_i128x128_aug2_5folds'
@@ -158,6 +158,7 @@ def prepare_train_features():
 def prepare_meta_publicHPA():
     cells_publicHPA_path = f'{DATA_DIR}/inputs/cells_publicHPA.csv'
     if os.path.exists(cells_publicHPA_path):
+        print(f'Loading {cells_publicHPA_path}')
         ifimages_v20_ = pd.read_csv(cells_publicHPA_path)
     else:
         ifimages_v20_ = pd.read_csv(f"{DATA_DIR}/inputs/{DATASET}.csv")
@@ -190,7 +191,7 @@ def prepare_meta_publicHPA():
     sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
     sc_labels = np.array([c/c.max() for c in sc_labels])
     # sc_labels = list(map(lambda row: [roundToNearest(c, 0.25) for c in row], sc_labels))
-    #sc_labels = [roundToNearest(c, 0.25) for c in sc_labels]
+    sc_labels = [roundToNearest(c, 0.25) for c in sc_labels]
     sc_labels = pd.DataFrame(np.round(il_labels*sc_labels).astype('uint8'))
     sc_labels.columns = LABEL_ALIASE_LIST
     
@@ -211,14 +212,14 @@ def prepare_meta_publicHPA():
     df_c.loc[multi_label_idx, 'target'] = multi_labels
 
     df_c.target.value_counts()
-    df_c.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction.csv', index=False)
+    df_c.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction_quarterthreshold.csv', index=False)
     
-    
+    """
     # Reorganize cells_publicHPA.csv for correct cell order with features file
     labels = il_labels
     il_labels = pd.DataFrame(il_labels)
     il_labels.columns = LABEL_ALIASE_LIST
-     = pd.concat([df_c[["ID", "Label", "maskid", 'cellmask', 'ImageWidth', 'ImageHeight']], il_labels], axis=1)
+    # = pd.concat([df_c[["ID", "Label", "maskid", 'cellmask', 'ImageWidth', 'ImageHeight']], il_labels], axis=1)
 
     single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
     single_labels = labels[single_label_idx]
@@ -232,10 +233,10 @@ def prepare_meta_publicHPA():
     ifimages_v20_.loc[multi_label_idx, 'target'] = multi_labels
     ifimages_v20_.target.values_count()
     ifimages_v20_.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA.csv', index=False)
-    
+    """
     
 def roundToNearest(inputNumber, base=0.25):
-    return base*round(inputNumber/base)
+    return base*np.round(inputNumber/base)
 
 def fit_umap(preprocess=True):
     if preprocess:
