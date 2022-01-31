@@ -77,20 +77,23 @@ def show_features_fit_transform(features, sub_df, umap_args, pca=False, show_mul
         verbose=False)
     X = reducer.fit_transform(features.tolist())
     
-    rm_outliers = abs(X[:,0])<6
-    print(len(rm_outliers), rm_outliers)
-    X = X[rm_outliers,:]
-    sub_df = sub_df[rm_outliers]
+    if False:
+        rm_outliers = abs(X[:,0])<6
+        print(len(rm_outliers), rm_outliers)
+        X = X[rm_outliers,:]
+        sub_df = sub_df[rm_outliers]
 
     num_classes = NUM_CLASSES if show_multi else NUM_CLASSES-1
     fig, ax = plt.subplots(figsize=(32, 16))
     for i in range(num_classes):
         label = LABEL_TO_ALIAS[i]
+        if label in ['Negative', 'Multi-Location']:
+            continue
         idx = np.where(sub_df['target']==label)[0]
         x = X[idx, 0]
         y = X[idx, 1]
         #print(label, sub_df['Label'][idx])
-        plt.scatter(x, y, c=COLORS[i],label=LABEL_TO_ALIAS[i], s=8, alpha=0.3)
+        plt.scatter(x, y, c=COLORS[i],label=LABEL_TO_ALIAS[i], s=16, alpha=0.5)
 
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width* 0.8, box.height])
@@ -120,17 +123,17 @@ def main():
     
     umap_args = dict({
         'n_neighbors':15, 
-        'min_dist':0.05, 
-        'n_components':3,
-        'n_epochs':300,
-        'metric':'euclidean'
+        'min_dist':0.1, 
+        'n_components':2,
+        'n_epochs':1000,
+        'metric':'manhattan'
     })
     
     for i in range(5):
-        sub_df = public_hpa_df0.sample(frac=0.7, random_state=i).groupby('target').head(20000)
+        sub_df = public_hpa_df0.sample(frac=1, random_state=i).head(170000)#.groupby('target').head(20000)
         features =  train_features[sub_df.index]  
         print(features.shape)
-        show_features_fit_transform(features, sub_df, umap_args, pca=False, show_multi=True, title=f'iteration_{i}')
+        show_features_fit_transform(features, sub_df, umap_args, pca=False, show_multi=True, title=f'randombatch_{i}_nogrouping')
             
 if __name__ == '__main__':
     main()
