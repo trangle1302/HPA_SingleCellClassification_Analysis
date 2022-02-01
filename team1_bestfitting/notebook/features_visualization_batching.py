@@ -74,7 +74,8 @@ def show_features_fit_transform(features, sub_df, umap_args, pca=False, show_mul
         n_components=umap_args['n_components'], 
         metric=umap_args['metric'],
         random_state=99, 
-        verbose=False)
+        n_jobs=10,
+        verbose=True)
     X = reducer.fit_transform(features.tolist())
     
     if False:
@@ -123,14 +124,14 @@ def main():
     
     umap_args = dict({
         'n_neighbors':15, 
-        'min_dist':0.1, 
+        'min_dist':0.05, 
         'n_components':2,
-        'n_epochs':1000,
-        'metric':'manhattan'
+        'n_epochs':300,
+        'metric':'euclidean'
     })
     
     for i in range(5):
-        sub_df = public_hpa_df0.sample(frac=1, random_state=i).head(170000)#.groupby('target').head(20000)
+        sub_df = public_hpa_df0.sample(frac=1, random_state=i).head(200000)#.groupby('target').head(20000)
         features =  train_features[sub_df.index]  
         print(features.shape)
         show_features_fit_transform(features, sub_df, umap_args, pca=False, show_multi=True, title=f'randombatch_{i}_nogrouping')
