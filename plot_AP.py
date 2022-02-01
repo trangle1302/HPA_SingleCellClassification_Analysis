@@ -98,6 +98,7 @@ plot_order = [k for k,v in sorted(label_counts_private.items(), key=lambda item:
 
 label_counts =pd.DataFrame.from_dict(label_counts)
 label_counts["ShortLabelName"] = label_counts.index
+label_counts.to_csv(f'{save_dir}/Label_distribution.csv', index=False)
 label_counts = pd.melt(label_counts, id_vars=["ShortLabelName"])
 label_counts.ShortLabelName = pd.Categorical(label_counts.ShortLabelName, 
                              ordered=True,
