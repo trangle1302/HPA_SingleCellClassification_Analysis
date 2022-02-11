@@ -124,14 +124,14 @@ def main():
     
     umap_args = dict({
         'n_neighbors':15, 
-        'min_dist':0.05, 
+        'min_dist':0.1, 
         'n_components':2,
         'n_epochs':300,
         'metric':'euclidean'
     })
     
     for i in range(5):
-        sub_df = public_hpa_df0.sample(frac=1, random_state=i).head(200000)#.groupby('target').head(20000)
+        sub_df = public_hpa_df0.sample(frac=1, random_state=i).head(300000)#.groupby('target').head(20000)
         features =  train_features[sub_df.index]  
         print(features.shape)
         show_features_fit_transform(features, sub_df, umap_args, pca=False, show_multi=True, title=f'randombatch_{i}_nogrouping')
