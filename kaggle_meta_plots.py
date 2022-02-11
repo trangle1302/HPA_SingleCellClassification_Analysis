@@ -47,6 +47,28 @@ submissions_hpa = pd.read_csv("./tmp/submissions_hpa.csv")
 submissions_hpa['Medal'][submissions_hpa.Medal.isna()] = 'None'
 n_teams = len(submissions_hpa.TeamId.unique())
 
+aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby(['TeamId','PrivateLeaderboardRank']).agg({
+    'PublicScoreLeaderboardDisplay': 'count',
+    }).reset_index()
+aggregated_performance['AvgSubmissionNumber'] = aggregated_performance.PublicScoreLeaderboardDisplay/105
+
+print(f'Average submission number of all teams {aggregated_performance.AvgSubmissionNumber.mean()}')
+print(f'Average submission number of top 10 teams {aggregated_performance[aggregated_performance.PrivateLeaderboardRank<11].AvgSubmissionNumber.mean()}') 
+
+submissions_hpa.dropna(subset=['ScoreDate']).groupby(['TeamId','Medal']).agg({
+    'PublicScoreLeaderboardDisplay': 'count',
+    }).groupby('Medal').agg({
+    'PublicScoreLeaderboardDisplay': 'mean',
+    })
+        
+  
+#%% Team membership
+teams = pd.read_csv(os.path.join(KAGGLE_META,'Teams.csv'))
+teams = teams[teams.Id.isin(submissions_hpa.dropna(subset=['ScoreDate']).TeamId)]
+members = pd.read_csv(os.path.join(KAGGLE_META,'TeamMemberships.csv'))
+members = members[members.TeamId.isin(submissions_hpa.dropna(subset=['ScoreDate']).TeamId)]
+members.groupby('TeamId').agg({'UserId':'count'}).mean()
+
 aggregated_performance = submissions_hpa.dropna(subset=['ScoreDate']).groupby(['TeamId', 'DiffDate']).agg({
     'PublicScoreLeaderboardDisplay': 'max',
     'PrivateScoreLeaderboardDisplay': 'max'
