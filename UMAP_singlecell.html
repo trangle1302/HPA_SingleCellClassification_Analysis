@@ -426,7 +426,7 @@
                 size: dataObj.z?3:5,
                 color: dataObj.location_code.map((code, index)=>{
                     if(typeof code === 'string' || (!remove && !filter_func(table[index]))){
-                        return '#e0e0e030'
+                        return '#dddddd'
                     }
                     else{
                         return color_map[code]
