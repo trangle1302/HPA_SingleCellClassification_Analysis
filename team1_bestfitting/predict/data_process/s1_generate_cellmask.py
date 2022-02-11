@@ -30,7 +30,7 @@ def encode_mask(param):
   return df
 
 def generate_labels(row):
-  labels = np.array(row[LABEL].split('|'), dtype='int32')
+  labels = np.array(str(row[LABEL]).split('|'), dtype='int32')
   for label in labels:
     row[ALIASES[label]] = 1
   return row
@@ -58,7 +58,8 @@ def load_train_data():
 
 def load_test_data():
   data_df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/test.csv')
-  print(data_df.head(), sum(data_df.Label.isna()))
+  print(sum(data_df.Label.isna()))
+  print(data_df[data_df.Label.isna()])
   return data_df
 
 def generate_inputs(output_dir, pool, dataset='train'):
