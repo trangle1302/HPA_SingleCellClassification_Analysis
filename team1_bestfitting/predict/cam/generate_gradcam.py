@@ -6,6 +6,9 @@ import pandas as pd
 from tqdm import tqdm
 from timeit import default_timer as timer
 from importlib import import_module
+from scipy.signal import correlate2d
+from skimage.metrics import structural_similarity as ssim
+from sklearn.metrics import mean_squared_error as mse
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -108,7 +111,7 @@ def generate_dataloader(args):
 def generate_cam(args, test_loader, model):
     model = load_model(args) if model is None else model
     #print(model.fc_layers[2],model.fc_layers[4])
-    print(model.backbone.layer4[-1])
+    #print(model.backbone.layer4[-1])
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
     target_layers = [model.backbone.layer4[-1]]#[model.att_module.conv_after_concat] #[model.backbone.layer4[-1]] #[model.fc_layers[-2]] 
     cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
@@ -137,8 +140,13 @@ def generate_cam(args, test_loader, model):
                 visualization = show_cam_on_image(bgr_img/255, grayscale_cam[0], use_rgb=False)
                 sidebyside = np.r_[bgr_img,visualization]
                 cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['index'][0]}_{k}_{prob:.2f}.png", sidebyside)
-            resutls.append((iter_data['ID'][0], iter_data['index'][0], k, probs[v], grayscale_cam.mean(), grayscale_cam.max()))
-    resutls = pd.DataFrame(resutls, columns=["image_id", "cell_id", "Label", "prob", "cam_mean", "cam_max"])
+
+            m = mse(bgr_img[:,:,1], grayscale_cam.squeeze())
+            s = ssim(bgr_img[:,:,1], grayscale_cam.squeeze(), mode='valid')
+            print(iter_data['index'][0], k,m,s)
+
+            resutls.append((iter_data['ID'][0], iter_data['index'][0], k, probs[v], s, m))
+    resutls = pd.DataFrame(resutls, columns=["image_id", "cell_id", "Label", "prob", "ssim", "mse"])
     resutls.to_csv(f"{args.output_dir}/result_df.png", index=False)
 
 def main(args):
