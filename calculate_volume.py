@@ -13,7 +13,7 @@ def calculate_volume(df_gene):
 def main():
     d = '/data/kaggle-dataset/publicHPA_umap/results/webapp'
     predictions = pd.read_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox.csv')
-    gene_dfs = predictions.groupby('gene_names').agg({'x': ['min','max'],
+    gene_dfs = predictions.groupby(['gene_names','atlas_name']).agg({'x': ['min','max'],
                                                        'y': ['min','max'],
                                                        'z': ['min','max']})
     gene_dfs['x_range'] = gene_dfs.x['max'] - gene_dfs.x['min']
