@@ -1,14 +1,14 @@
-from io import IncrementalNewlineDecoder
 import sys
+
 sys.path.insert(0, '..')
 import argparse
 import pandas as pd
 from tqdm import tqdm
 from timeit import default_timer as timer
 from importlib import import_module
-from scipy.signal import correlate2d
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import mean_squared_error as mse
+from scipy.stats import pearsonr
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -68,7 +68,7 @@ def initialize_environment(args):
     if args.gpus:
       os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
     args.model_fpath = f'{DIR_CFGS.MODEL_DIR}/{args.model_dir}/fold{args.fold}/{args.model_epoch}.pth'
-    args.output_dir = f'{DIR_CFGS.DATA_DIR}/1st_cams/tmp'
+    args.output_dir = f'{DIR_CFGS.DATA_DIR}/1st_cams/test_df_cams'
     args.feature_dir = f'{DIR_CFGS.FEATURE_DIR}/{args.model_dir}/fold{args.fold}/epoch_{args.model_epoch}'
 
     if args.can_print:
@@ -108,6 +108,12 @@ def generate_dataloader(args):
     print(f'num: {test_dataset.__len__()}')
     return test_loader
 
+def iou(a,b):
+    intersection = np.intersect1d(a, b)
+    union = np.union1d(a, b)
+    iou = intersection.shape[0] / union.shape[0]
+    return iou
+
 def generate_cam(args, test_loader, model):
     model = load_model(args) if model is None else model
     #print(model.fc_layers[2],model.fc_layers[4])
@@ -116,45 +122,125 @@ def generate_cam(args, test_loader, model):
     target_layers = [model.backbone.layer4[-1]]#[model.att_module.conv_after_concat] #[model.backbone.layer4[-1]] #[model.fc_layers[-2]] 
     cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
     
-    resutls = []
+    #resutls = []
     augment='default' # default == nothing
+    F = open(f"{args.output_dir}/result_df2.csv", "a+")
+    print(f'writing to {args.output_dir}/result_df2.csv')
+    F.write("image_id,cell_id,label,prob,ssim,mse,binarized_ssim,binarized_mse\n")
     for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell {augment}'):
+        
         outputs = model(Variable(iter_data['image'].to(args.device)))
         logits = outputs
         probs = torch.sigmoid(logits)
         probs = probs.to('cpu').detach().numpy()[0]
-        top3 = np.argsort(probs)
+        #top3 = np.argsort(probs)
         inp = iter_data['image'].to(args.device)
         rgb_img = np.array(iter_data['image'][0][0:3,:,:]*255).astype(np.uint8).transpose(1, 2, 0)
         # channels:['red', 'green', 'blue', 'yellow'] or MT, protein, nu, ER
         # cv2 is in format BGR
         bgr_img = rgb_img[...,[2,1,0]]
-        cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}.png", bgr_img)
+        _,bgreen = cv2.threshold(bgr_img[:,:,1], 20, 255, cv2.THRESH_BINARY)
+        #cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}.png", bgr_img)
         for v,k in LABEL_TO_ALIAS.items():
             prob = np.round(probs[v],2)
             grayscale_cam = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v)], aug_smooth=True)
 
+            """
             if v in top3:
                 print(prob,grayscale_cam.mean(),grayscale_cam.max())
             #if prob > 0.3:
                 visualization = show_cam_on_image(bgr_img/255, grayscale_cam[0], use_rgb=False)
                 sidebyside = np.r_[bgr_img,visualization]
                 cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['index'][0]}_{k}_{prob:.2f}.png", sidebyside)
-
+            """
             m = mse(bgr_img[:,:,1], grayscale_cam.squeeze())
             s = ssim(bgr_img[:,:,1], grayscale_cam.squeeze(), mode='valid')
-            print(iter_data['index'][0], k,m,s)
+            
+            # converting to its binary form cv2.threshold(img, thres1, thres2, thres_type)
+            _,bcam = cv2.threshold(grayscale_cam.squeeze(), 0.1, 255, cv2.THRESH_BINARY)
+            bs = ssim(bgreen, bcam, mode='valid')
+            bm = mse(bgreen, bcam)
+            
+            #print(bs,s)
+            if bs > 0.99:
+                sidebyside = np.r_[bgreen,bcam]
+                cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['index'][0]}_{k}_{prob:.2f}.png", sidebyside)
+            line = f"{iter_data['ID'][0]},{iter_data['maskid'][0]},{k},{probs[v]},{s},{m},{bs},{bm}\n"
+            F.write(line)
+    F.close()
+            #resutls.append((iter_data['ID'][0], iter_data['index'][0], k, probs[v], s, m))
+    #resutls = pd.DataFrame(resutls, columns=["image_id", "cell_id", "Label", "prob", "ssim", "mse"])
+    #resutls.to_csv(f"{args.output_dir}/result_df.csv", index=False)
 
-            resutls.append((iter_data['ID'][0], iter_data['index'][0], k, probs[v], s, m))
-    resutls = pd.DataFrame(resutls, columns=["image_id", "cell_id", "Label", "prob", "ssim", "mse"])
-    resutls.to_csv(f"{args.output_dir}/result_df.png", index=False)
+def generate_cams_sclabel(args, test_loader, model):
+    labels_test = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv')
+    labels_test = labels_test[labels_test.Label.isin(list([str(f) for f in range(19)]))]
+    '''
+    # already done
+    df = pd.read_csv(f"{args.output_dir}/result_df_singlelabel.csv")
+    df['ID'] = ['_'.join((row.image_id, str(row.cell_id))) for i,row in df.iterrows()]
+    labels_test = labels_test[~labels_test.ID.isin(df.ID)]
+    '''
+    model = load_model(args) if model is None else model
+
+    test_loader = generate_dataloader(args) if test_loader is None else test_loader
+    target_layers = [model.backbone.layer4[-1]]#[model.att_module.conv_after_concat] #[model.backbone.layer4[-1]] #[model.fc_layers[-2]] 
+    cam = GradCAM(model=model, target_layers=target_layers, use_cuda=('cuda' == args.device))
+    
+    augment='default'
+    F = open(f"{args.output_dir}/result_df_all.csv", "a+")
+    print(f'Writing to {args.output_dir}/result_df_all.csv')
+    F.write("image_id,cell_id,label,prob,ssim,mse,binarized_ssim,binarized_mse,pearsonr_masked,pval_masked,pearsonr,pval,iou_all,iou_masked\n")
+    for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell {augment}'):
+
+        #if "_".join((str(iter_data['ID'][0]),str(iter_data['maskid'][0]))) not in labels_test.ID.values:
+        #    continue
+        outputs = model(Variable(iter_data['image'].to(args.device)))
+        logits = outputs
+        probs = torch.sigmoid(logits)
+        probs = probs.to('cpu').detach().numpy()[0]
+        inp = iter_data['image'].to(args.device)
+        compare_region = np.where(np.sum(iter_data['image'][0].numpy(), axis=0).flatten()>0)[0]
+        rgb_img = np.array(iter_data['image'][0][0:3,:,:]*255).astype(np.uint8).transpose(1, 2, 0)
+        #grayscale_cams = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v) for v in range(19)], aug_smooth=False)
+        #print(len(grayscale_cams),grayscale_cams[0].shape)
+        # channels:['red', 'green', 'blue', 'yellow'] or MT, protein, nu, ER
+        # cv2 is in format BGR
+        #grayscale_cams = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v) for v in range(19)], aug_smooth=True)
+        bgr_img = rgb_img[...,[2,1,0]]
+        _,bgreen = cv2.threshold(bgr_img[:,:,1], 20, 255, cv2.THRESH_BINARY)
+        for v,k in LABEL_TO_ALIAS.items():
+            prob = np.round(probs[v],2)
+            grayscale_cam = cam(input_tensor=inp, targets=[ClassifierOutputTarget(v)], aug_smooth=True).squeeze()
+            #grayscale_cam = grayscale_cams[v]
+            grayscale_cam = (grayscale_cam*255).astype('uint8')
+            m = mse(bgr_img[:,:,1], grayscale_cam)
+            s = ssim(bgr_img[:,:,1], grayscale_cam, mode='valid')
+            
+            # converting to its binary form cv2.threshold(img, thres1, thres2, thres_type)
+            _,bcam = cv2.threshold(grayscale_cam, 10, 255, cv2.THRESH_BINARY)
+            bs = ssim(bgreen, bcam, mode='valid')
+            bm = mse(bgreen, bcam)
+            iou_all = iou(bcam.flatten(), bgreen.flatten())
+            iou_masked = iou(bcam.flatten()[compare_region], bgreen.flatten()[compare_region])
+
+            #Pearson r of only masked pixels
+            pearson_masked,pval_masked = pearsonr(bcam.flatten()[compare_region], bgreen.flatten()[compare_region])
+            pearson,pearson_pval = pearsonr(bcam.flatten(), bgreen.flatten())
+
+            sidebyside = np.r_[np.c_[bgr_img[:,:,1], grayscale_cam],np.c_[bgreen,bcam]]
+            cv2.imwrite(f"{args.output_dir}/{iter_data['ID'][0]}_{iter_data['maskid'][0]}_{k}_{prob:.2f}.png", sidebyside)
+            line = f"{iter_data['ID'][0]},{iter_data['maskid'][0]},{k},{prob},{s},{m},{bs},{bm},{pearson_masked},{pval_masked},{pearson},{pearson_pval},{iou_all},{iou_masked}\n"
+            F.write(line)
+    F.close()
 
 def main(args):
     start_time = timer()
     args = initialize_environment(args)
     model = None
     test_loader = None
-    generate_cam(args, test_loader, model)
+    #generate_cam(args, test_loader, model)
+    generate_cams_sclabel(args, test_loader, model)
     end_time = timer()
     print(f'time: {(end_time - start_time) / 60.:.2f} min.')
 
