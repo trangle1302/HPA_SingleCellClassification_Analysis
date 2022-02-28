@@ -5,6 +5,7 @@ import json
 from plotnine import *
 import os
 import seaborn as sns
+from tqdm import tqdm
 
 def read_from_json(json_file_path):
     """Function to read json file (annotation file)
@@ -30,6 +31,37 @@ def get_location_counts(label_list, all_locations):
                 label_counts[loc] += 1
     return label_counts
 
+def merge_labels(location_names):
+    loc_merged = {
+        "Vesicles and punctate cytosolic patterns": [
+            "Vesicles",
+            "Peroxisomes",
+            "Endosomes",
+            "Lysosomes",
+            "Lipid droplets",
+            "Cytoplasmic bodies",
+        ],
+        "Centrosome": ["Centrosome", "Centriolar satellite"],
+        "Plasma membrane": ["Plasma membrane", "Cell Junctions"],
+    }
+    loc_map = {
+        "Vesicles": "Vesicles and punctate cytosolic patterns",
+        "Peroxisomes": "Vesicles and punctate cytosolic patterns",
+        "Endosomes": "Vesicles and punctate cytosolic patterns",
+        "Lysosomes": "Vesicles and punctate cytosolic patterns",
+        "Lipid droplets": "Vesicles and punctate cytosolic patterns",
+        "Cytoplasmic bodies": "Vesicles and punctate cytosolic patterns",
+        "Centrosome": "Centrosome",
+        "Centriolar satellite": "Centrosome",
+        "Plasma membrane": "Plasma membrane",
+        "Cell Junctions": "Plasma membrane",
+        "Focal adhesion sites": "Actin filaments",
+    }
+    location_names_return = location_names.copy()
+    for i, loc in enumerate(location_names_return):
+        if loc in list(loc_map.keys()):
+            location_names_return[i] = loc_map[loc]
+    return location_names_return
 
 mapping = dict({
     "Nucleoplasm": 0,
@@ -84,6 +116,25 @@ label_df = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020
 label_df = label_df[label_df.latest_version==19]
 label_df = label_df[~label_df.locations_reindex.isna()]
 label_counts_pHPA = get_location_counts(label_df.locations_reindex.values.tolist(), mapping)
+LABEL_NAMES_REV = dict([(v,k) for k,v in LABEL_NAMES.items()])
+ifimage = pd.read_csv('/home/trangle/Downloads/IF-image.csv')
+ifimage = ifimage[ifimage.latest_version==20]
+ifimage['Merged_label'] = ''
+ifimage['LabelIndex'] = ''
+idx_nan = []
+for i,row in tqdm(ifimage.iterrows(), total=ifimage.shape[0]):
+    try:
+        img_locations = merge_labels(row.locations.split(','))
+        ifimage.loc[i,'Merged_label'] = ",".join(img_locations)
+        img_locations = [org for org in img_locations if org in LABEL_NAMES_REV.keys()]
+        ifimage.loc[i,'LabelIndex'] = "|".join([str(LABEL_NAMES_REV[org]) for org in img_locations])
+    except:
+        if row.unspecific == 0: #if there's no label and not unspecific, then it's negative
+            ifimage.loc[i,'Merged_label'] = "Negative" 
+            ifimage.loc[i,'LabelIndex'] = "18"
+        idx_nan += [i]
+tmp = ifimage[ifimage.LabelIndex!='']
+labelcount_2021 = get_location_counts(tmp.LabelIndex.values.tolist(), mapping)
 
 label_df = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/privatetest/labels_privatetest.csv')
 label_counts_private = get_location_counts(label_df.Label.values.tolist(), mapping)
