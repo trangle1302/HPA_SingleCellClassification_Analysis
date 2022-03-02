@@ -31,6 +31,7 @@ def move_publichpa(ifimage, data_dir, save_dir, channels):
             dest_path = os.path.join(save_dir, filename.split("/")[-1] + ch)
             if os.path.exists(dest_path):
                 continue
+            
             try:
                 shutil.copy(img_path, dest_path)
                 print(f"Copied {img_path}.......{dest_path}")
@@ -87,6 +88,7 @@ def add_label_idx(df, all_locations):
     for i, row in df.iterrows():
         locations = str(row.locations)
         if locations == 'nan':
+            df.loc[i,"Label"] = "18"
             continue
         labels = locations.split(',')
         idx = []
@@ -95,8 +97,6 @@ def add_label_idx(df, all_locations):
                 idx.append(str(all_locations[l]))
         if len(idx)>0:
             df.loc[i,"Label"] = "|".join(idx)
-            
-        #print(df.loc[i,"locations"], df.loc[i,"Label"])
     return df
 
 
@@ -112,13 +112,20 @@ def main():
     #ifimages_v21 = ifimages[ifimages.latest_version == 21.0]
     ifimages['v21'] = ['21.0' in str(r.versions).split(',') for _,r in ifimages.iterrows()]
     ifimages_v21 = ifimages[ifimages.v21==True]
-    print(f'Number of images {ifimages_v21.shape[0]}, {ifimages_v21.gene_names.nunique()} genes')
+
+    genelist = [f.split(',') for f in ifimages_v21.ensembl_ids]
+    genelist = [item for sublist in genelist for item in sublist]
+    print(f'Number of images {ifimages_v21.shape[0]}, {len(set(genelist))} genes')
+
+    print(ifimages_v21.shape)
     ifimages_v21 = add_label_idx(ifimages_v21, all_locations)
-    #ifimages_v20["Labels"] = ["" if str(l) == "nan" else l for l in ifimages_v20.Label]
+    print(ifimages_v21.shape)
+
     ifimages_v21["ID"] = [os.path.basename(f)[:-1] for f in ifimages_v21.filename]
     ifimages_v21_ = ifimages_v21[["ID","Label","gene_names","ensembl_ids","atlas_name","locations"]]
-    ifimages_v21_ = ifimages_v21[ifimages_v21.Label.isna() == False]
-    ifimages_v21_.to_csv(os.path.join(SAVE_DIR.replace("images", "raw"), "train.csv"), index=False)
+    #ifimages_v21_ = ifimages_v21[ifimages_v21.Label.isna() == False]
+    print(ifimages_v21_[ifimages_v21.Label.isna()])
+    ifimages_v21_.to_csv(os.path.join(SAVE_DIR.replace("images", "raw"), "test.csv"), index=False)
         
     
     move_publichpa(ifimages_v21, DATA_DIR, SAVE_DIR, CHANNELS)
