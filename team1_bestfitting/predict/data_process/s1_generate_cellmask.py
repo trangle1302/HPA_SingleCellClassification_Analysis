@@ -60,6 +60,7 @@ def load_test_data():
   data_df = pd.read_csv(f'{DIR_CFGS.DATA_DIR}/raw/test.csv')
   print(sum(data_df.Label.isna()))
   print(data_df[data_df.Label.isna()])
+  data_df = data_df[~data_df.Label.isna()]
   return data_df
 
 def generate_inputs(output_dir, pool, dataset='train'):
@@ -170,7 +171,7 @@ def main(args, split_df=None, mask_output_dir=None):
   pool = SuperPool(n_cpu=24)
   output_dir = f'{DIR_CFGS.DATA_DIR}/inputs'
   generate_inputs(output_dir, pool, dataset=args.dataset)
-  #generate_cellmask(args, split_df, mask_output_dir)
+  generate_cellmask(args, split_df, mask_output_dir)
   generate_cellmask_csv(dataset=args.dataset, pool=pool)
 
 if __name__ == '__main__':
