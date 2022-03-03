@@ -31,7 +31,7 @@ def move_publichpa(ifimage, data_dir, save_dir, channels):
             dest_path = os.path.join(save_dir, filename.split("/")[-1] + ch)
             if os.path.exists(dest_path):
                 continue
-            
+
             try:
                 shutil.copy(img_path, dest_path)
                 print(f"Copied {img_path}.......{dest_path}")
@@ -49,7 +49,7 @@ def move_publichpa(ifimage, data_dir, save_dir, channels):
                             url = url.replace(".png", ".tif")
                             r = requests.get(url, auth=HTTPBasicAuth('trang', 'H3dgeh0g'))
                             tf = r.content
-                            print(r.status_code, url)
+                            #print(r.status_code, url)
                         else:
                             f = io.BytesIO(r.content)
                             tf = gzip.open(f).read()
