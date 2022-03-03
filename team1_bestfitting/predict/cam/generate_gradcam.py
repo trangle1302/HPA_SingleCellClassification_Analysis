@@ -1,3 +1,4 @@
+from operator import index
 import sys
 
 sys.path.insert(0, '..')
@@ -9,7 +10,8 @@ from importlib import import_module
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import mean_squared_error as mse
 from scipy.stats import pearsonr
-
+import matplotlib.pyplot as plt
+import glob
 import torch
 import torch.backends.cudnn as cudnn
 from torch.nn import DataParallel
@@ -234,13 +236,63 @@ def generate_cams_sclabel(args, test_loader, model):
             F.write(line)
     F.close()
 
+def calculate_iou(args, test_loader):
+    labels_test = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv')
+    labels_test = labels_test[labels_test.Label.isin(list([str(f) for f in range(19)]))] #Filtered for single label
+    labels_test['LabelName'] = [LABEL_TO_ALIAS[int(f)] for f in labels_test.Label]
+
+    df = pd.read_csv(f"{args.output_dir}/result_df_all.csv")
+    df.columns = ['label', 'prob', 'ssim', 'mse', 'binarized_ssim', 'binarized_mse', 'pearsonr_masked', 'pval_masked', 'pearsonr', 'pval', 'iou_all','iou_masked']
+    df['image_id'] = [x[0] for x in df.index]
+    df['cell_id'] = [x[1] for x in df.index]
+    df['ID'] = ['_'.join([x[0], str(x[1])]) for x in df.index]
+    df.to_csv(f"{args.output_dir}/result_df_all_fixedcolumns.csv", index=False)
+    df_singlelabel = df.merge(labels_test, how='inner', left_on=['ID','label'], right_on=['ID','LabelName'])
+    
+    test_loader = generate_dataloader(args) if test_loader is None else test_loader
+    for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell default'):
+        cell_id = "_".join((str(iter_data['ID'][0]),str(iter_data['maskid'][0])))
+        if cell_id not in df_singlelabel.ID.values:
+            continue
+
+        compare_region = np.where(np.sum(iter_data['image'][0].numpy(), axis=0).flatten()>0)[0]
+
+        i = df_singlelabel[df_singlelabel.ID==cell_id].index[0]
+        r = df_singlelabel.iloc[i,]
+        merged_img = plt.imread(glob.glob(f'{args.output_dir}/{r.image_id}_{r.cell_id}_{r.label}_*')[0])
+        cam = merged_img[:128, 128:]
+        green = merged_img[:128,:128]
+        bgreen = merged_img[128:,:128]
+        _,bcam = cv2.threshold(cam*255, 30, 1, cv2.THRESH_BINARY)
+        
+        overlap = bcam.astype('bool')*bgreen.astype('bool')
+        union = bcam.astype('bool') + bgreen.astype('bool')
+        iou_a = overlap.sum()/float(union.sum())
+        df_singlelabel.loc[i,'iou_all'] = iou_a
+
+        overlap = bcam.flatten()[compare_region].astype('bool') * bgreen.flatten()[compare_region].astype('bool')
+        union = bcam.flatten()[compare_region].astype('bool') + bgreen.flatten()[compare_region].astype('bool')
+        iou_m = overlap.sum()/float(union.sum())
+        df_singlelabel.loc[i,'iou_masked'] = iou_m
+        fig,ax = plt.subplots(2,3, sharex='all',sharey=True)
+        ax[0,0].imshow(green)
+        ax[0,1].imshow(cam)
+        ax[1,0].imshow(bgreen)
+        ax[1,0].text(10,10,s=f'IOU_a: {iou_a}',c='white')
+        ax[1,1].imshow(bcam)
+        ax[1,1].text(10,10,s=f'IOU_m: {iou_m}',c='white')
+        ax[0,2].imshow(np.sum(iter_data['image'][0].numpy(), axis=0)>0)
+        plt.savefig(f'{DIR_CFGS.DATA_DIR}/1st_cams/tmp/{r.image_id}_{r.cell_id}_{r.label}.png')
+    df_singlelabel.to_csv(f"{args.output_dir}/result_df_singlelabel.csv")
+
 def main(args):
     start_time = timer()
     args = initialize_environment(args)
     model = None
     test_loader = None
     #generate_cam(args, test_loader, model)
-    generate_cams_sclabel(args, test_loader, model)
+    #generate_cams_sclabel(args, test_loader, model)
+    calculate_iou(args, test_loader)
     end_time = timer()
     print(f'time: {(end_time - start_time) / 60.:.2f} min.')
 
