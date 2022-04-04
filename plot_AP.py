@@ -107,6 +107,33 @@ aggregated_performance = df.groupby('LabelName').agg({
     }).reset_index()
 aggregated_performance.to_csv(f'{save_dir}/Kaggle_AP_mean_std.csv', index=False)
 
+
+def q25(x):
+    return x.quantile(0.25)
+
+def q50(x):
+    return x.quantile(0.5)
+
+def q75(x):
+    return x.quantile(0.75)
+
+aggregated_performance = df.groupby('LabelName').agg({
+    'AP_public': ['mean','min',q25,q50,q75,'max'],
+    'AP_private': ['mean','min',q25,q50,q75,'max']
+    }).reset_index()
+for i in range(19):
+    r = aggregated_performance.iloc[i]
+    l = r.values[0]
+    minimum = round(r[('AP_private',  'min')],2)
+    m = round(r[('AP_private',  'mean')],2)
+    percentile25 = round(r[('AP_private',  'q25')],2)
+    percentile50 = round(r[('AP_private',  'q50')],2)
+    percentile75 = round(r[('AP_private',  'q75')],2)
+    maximum = round(r[('AP_private',  'max')],2)
+    
+    print(f'{l} (min: {minimum}, mean: {m}, 25th P: {percentile25}, 50th P: {percentile50}, 75th P: {percentile75}, max: {maximum})')
+    
+
 ### Label counts of train and test sets
 label_df = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/kaggle_master_training_reindex.csv')
 label_df = label_df[~label_df.locations_reindex.isna()]
