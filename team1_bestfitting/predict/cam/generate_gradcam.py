@@ -57,7 +57,7 @@ def initialize_environment(args):
     else:
         raise ValueError(','.join(args.image_size))
 
-    args.num_workers = 1#4
+    args.num_workers = 4
     args.split_type = 'random'
     args.suffix = 'png'
     args.augments = args.augments.split(',')
@@ -237,25 +237,32 @@ def generate_cams_sclabel(args, test_loader, model):
     F.close()
 
 def calculate_iou(args, test_loader):
-    labels_test = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv')
-    labels_test = labels_test[labels_test.Label.isin(list([str(f) for f in range(19)]))] #Filtered for single label
-    labels_test['LabelName'] = [LABEL_TO_ALIAS[int(f)] for f in labels_test.Label]
-
-    if os.path.exists(f"{args.output_dir}/result_df_all_fixedcolumns.csv"):
-        df = pd.read_csv(f"{args.output_dir}/result_df_all_fixedcolumns.csv")
+    if os.path.exists(f"{args.output_dir}/result_df_singlelabel.csv"):
+        df_singlelabel = pd.read_csv(f"{args.output_dir}/result_df_singlelabel.csv")
     else:
-        df = pd.read_csv(f"{args.output_dir}/result_df_all.csv")
-        df.columns = ['label', 'prob', 'ssim', 'mse', 'binarized_ssim', 'binarized_mse', 'pearsonr_masked', 'pval_masked', 'pearsonr', 'pval', 'iou_all','iou_masked']
-        df['image_id'] = [x[0] for x in df.index]
-        df['cell_id'] = [x[1] for x in df.index]
-        df['ID'] = ['_'.join([x[0], str(x[1])]) for x in df.index]
-        df.to_csv(f"{args.output_dir}/result_df_all_fixedcolumns.csv", index=False)
-    df_singlelabel = df.merge(labels_test, how='inner', left_on=['ID','label'], right_on=['ID','LabelName'])
+        labels_test = pd.read_csv('/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/labels.csv')
+        labels_test = labels_test[labels_test.Label.isin(list([str(f) for f in range(19)]))] #Filtered for single label
+        labels_test['LabelName'] = [LABEL_TO_ALIAS[int(f)] for f in labels_test.Label]
+        
+        if os.path.exists(f"{args.output_dir}/result_df_all_fixedcolumns.csv"):
+            df = pd.read_csv(f"{args.output_dir}/result_df_all_fixedcolumns.csv")
+        else:
+            df = pd.read_csv(f"{args.output_dir}/result_df_all.csv")
+            df.columns = ['label', 'prob', 'ssim', 'mse', 'binarized_ssim', 'binarized_mse', 'pearsonr_masked', 'pval_masked', 'pearsonr', 'pval', 'iou_all','iou_masked']
+            df['image_id'] = [x[0] for x in df.index]
+            df['cell_id'] = [x[1] for x in df.index]
+            df['ID'] = ['_'.join([x[0], str(x[1])]) for x in df.index]
+            df.to_csv(f"{args.output_dir}/result_df_all_fixedcolumns.csv", index=False)
+        df_singlelabel = df.merge(labels_test, how='inner', left_on=['ID','label'], right_on=['ID','LabelName'])
     print(f'Number of single cells with single labels : {df_singlelabel.shape[0]}')
+    #l_done = glob.glob(f'{DIR_CFGS.DATA_DIR}/1st_cams/tmp/*.png')
+    #l_done = [l.rsplit('/',1)[1].rsplit('_',1)[0] for l in l_done]
+    l_done = df_singlelabel[~df_singlelabel.iou_all.isin([0,1])].ID.to_list()
+    print(f"Number of cells done {len(l_done)}")
     test_loader = generate_dataloader(args) if test_loader is None else test_loader
     for it, iter_data in tqdm(enumerate(test_loader, 0), total=len(test_loader), desc=f'cell default'):
         cell_id = "_".join((str(iter_data['ID'][0]),str(iter_data['maskid'][0])))
-        if cell_id not in df_singlelabel.ID.values:
+        if cell_id in l_done:
             continue
 
         compare_region = np.where(np.sum(iter_data['image'][0].numpy(), axis=0).flatten()>0)[0]
@@ -287,8 +294,8 @@ def calculate_iou(args, test_loader):
         ax[0,2].imshow(np.sum(iter_data['image'][0].numpy(), axis=0)>0)
         plt.savefig(f'{DIR_CFGS.DATA_DIR}/1st_cams/tmp/{r.image_id}_{r.cell_id}_{r.label}.png')
         if it % 1000 == 0:
-            df_singlelabel.to_csv(f"{args.output_dir}/result_df_singlelabel.csv")
-    df_singlelabel.to_csv(f"{args.output_dir}/result_df_singlelabel.csv")
+            df_singlelabel.to_csv(f"{args.output_dir}/result_df_singlelabel1.csv", index=False)
+    df_singlelabel.to_csv(f"{args.output_dir}/result_df_singlelabel1.csv", index=False)
 
 def main(args):
     start_time = timer()
