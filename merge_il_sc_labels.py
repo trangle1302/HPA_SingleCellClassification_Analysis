@@ -96,6 +96,36 @@ COLORS = [
 ]
 MERGE_TYPE = 'quarterthreshold' # 'addSC'
 
+
+LABEL_NAMES_MERGED = {
+  'Nucleoplasm':'Nucleoplasm',
+  'Nuclear membrane':'Nuclear membrane',
+  'Nucleoli':'Nucleoli',
+  'Nucleoli fibrillar center':'Nucleoli fibrillar center',
+  'Nuclear speckles':'Nuclear speckles',
+  'Nuclear bodies':'Nuclear bodies',
+  'Endoplasmic reticulum':'Endoplasmic reticulum',
+  'Golgi apparatus':'Golgi apparatus',
+  'Intermediate filaments':'Intermediate filaments',
+  'Actin filaments':'Actin filaments',
+  'Focal adhesion sites':'Actin filaments',
+  'Microtubules':'Microtubules',
+  'Mitotic spindle':'Mitotic spindle',
+  'Centrosome':'Centrosome',
+  'Centriolar satellite':'Centrosome',
+  'Plasma membrane':'Plasma membrane',
+  'Cell Junctions':'Plasma membrane',
+  'Mitochondria':'Mitochondria',
+  'Aggresome':'Aggresome',
+  'Cytosol':'Cytosol',
+  'Vesicles':'Vesicles and punctate cytosolic patterns',
+  'Peroxisomes':'Vesicles and punctate cytosolic patterns',
+  'Endosomes':'Vesicles and punctate cytosolic patterns',
+  'Lysosomes':'Vesicles and punctate cytosolic patterns',
+  'Lipid droplets':'Vesicles and punctate cytosolic patterns',
+  'Cytoplasmic bodies':'Vesicles and punctate cytosolic patterns'
+}
+
 def roundToNearest(inputNumber, base=0.25):
     return base*np.round(inputNumber/base)
 
@@ -153,6 +183,63 @@ def prepare_meta_publicHPA():
             df_c.loc[i,'prob'] = prediction[prediction.cellid == row.cellid][label].values[0]
     df_c.target.value_counts()
     df_c.to_csv(f'{DATA_DIR}/inputs/cells_publicHPA_mergedSCprediction_{MERGE_TYPE}.csv', index=False)
+    
+
+def prepare_meta_publicHPAv21():
+    prediction = pd.read_csv(f'{FEATURE_DIR.replace("features","result")}/{MODEL_NAME}/fold0/epoch_12.00_ema/cell_result_test_cell_v1.csv')
+    prediction["cellmask"] = prediction["mask"]
+    prediction = prediction.drop(columns=["mask"])    
+
+    ifimage = pd.read_csv('/data/HPA-IF-images/IF-image.csv')
+    ifimage["ID"] = [f.rsplit('/',1)[1][:-1] for f in ifimage.filename]
+    ifimage = ifimage[ifimage.ID.isin(prediction.ID)]
+    print(ifimage['Ab state'].value_counts())
+    print('Taking only image with "IF_FINISHED"')
+    ifimage = ifimage[ifimage['Ab state']=="IF_FINISHED"]
+    all_labels = [l.split(',') for l in ifimage.locations if str(l)!='nan']
+    all_labels = set([sl for l in all_labels for sl in l])
+    rm_labels = all_labels.difference(LABEL_NAMES_MERGED.keys())
+    rm_labels = ['Rods & rings', 'Cell junctions', 'Midbody', 'Midbody ring', 'Cytokinetic bridge']
+    tmp = []
+    for i,r in ifimage.iterrows():
+        try:
+            ls = r.locations.split(',')
+            ls = [l for l in ls if l not in rm_labels]
+            if len(ls) > 1:
+                ls = [LABEL_NAMES_MERGED[l] for l in ls]
+                tmp.append(",".join(ls))
+            elif len(ls) == 1:
+                tmp.append(LABEL_NAMES_MERGED[ls[0]])
+            else:
+                tmp.append("")
+        except:
+            tmp.append("")
+    ifimage["locations_cleanedup"] = tmp
+    ifimage = ifimage.reset_index()
+    m = np.zeros((ifimage.shape[0],len(LABEL_ALIASE_LIST)))
+    for i,r in ifimage.iterrows():
+        if r.locations_cleanedup != "":
+            ls = r.locations_cleanedup.split(',')
+            for l in ls:
+                m[i,LABEL_NAME_LIST.index(l)] = 1
+    m[m!=1]=0
+    df = pd.DataFrame(m)
+    df.columns = LABEL_ALIASE_LIST
+
+    single_label_idx = np.where((m==1).sum(axis=1)==1)[0]
+    single_labels = m[single_label_idx]
+    idx1 = np.where(single_labels==1)
+    single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
+
+    multi_label_idx = np.where((m==1).sum(axis=1)>1)[0]
+    multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
+
+    df['target'] = 'unknown'
+    df.loc[single_label_idx, 'target'] = single_labels
+    df.loc[multi_label_idx, 'target'] = multi_labels
+    df['target'].value_counts()
+    df['ID'] = ifimage.ID
+
     
 
 if __name__ == '__main__':
