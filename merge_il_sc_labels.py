@@ -188,7 +188,12 @@ def prepare_meta_publicHPA():
 def prepare_meta_publicHPAv21():
     prediction = pd.read_csv(f'{FEATURE_DIR.replace("features","result")}/{MODEL_NAME}/fold0/epoch_12.00_ema/cell_result_test_cell_v1.csv')
     prediction["cellmask"] = prediction["mask"]
-    prediction = prediction.drop(columns=["mask"])    
+    prediction = prediction.drop(columns=["mask"])  
+    prediction['id'] = ['_'.join((r.ID, str(r.maskid))) for _,r in prediction.iterrows()]
+    d = '/data/kaggle-dataset/publicHPA_umap/results/webapp'
+    predictions0 = pd.read_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox.csv')
+    predictions0['id'] = [f.split('_',1)[1] for f in predictions0.id]
+    prediction = prediction.merge(predictions0.drop(columns=['location_code', 'locations','gene_names', 'ensembl_ids', 'atlas_name','target']), on = ['id'])
 
     ifimage = pd.read_csv('/data/HPA-IF-images/IF-image.csv')
     ifimage["ID"] = [f.rsplit('/',1)[1][:-1] for f in ifimage.filename]
@@ -199,7 +204,6 @@ def prepare_meta_publicHPAv21():
     all_labels = [l.split(',') for l in ifimage.locations if str(l)!='nan']
     all_labels = set([sl for l in all_labels for sl in l])
     rm_labels = all_labels.difference(LABEL_NAMES_MERGED.keys())
-    rm_labels = ['Rods & rings', 'Cell junctions', 'Midbody', 'Midbody ring', 'Cytokinetic bridge']
     tmp = []
     for i,r in ifimage.iterrows():
         try:
@@ -223,7 +227,7 @@ def prepare_meta_publicHPAv21():
             for l in ls:
                 m[i,LABEL_NAME_LIST.index(l)] = 1
     m[m!=1]=0
-    df = pd.DataFrame(m)
+    df = pd.DataFrame(m) # m= matrix of image-level labels
     df.columns = LABEL_ALIASE_LIST
 
     single_label_idx = np.where((m==1).sum(axis=1)==1)[0]
@@ -239,8 +243,53 @@ def prepare_meta_publicHPAv21():
     df.loc[multi_label_idx, 'target'] = multi_labels
     df['target'].value_counts()
     df['ID'] = ifimage.ID
+    df = df.merge(ifimage[['ID','locations','locations_cleanedup','gene_names','ensembl_ids','atlas_name']], on=['ID'])
 
-    
+
+    # Merged labels in previous multiplication step, now reformat target column
+    tmp = prediction.merge(df, how='inner', on=['ID'])
+
+    il_labels = tmp[[l+'_y' for l in LABEL_ALIASE_LIST]].values
+    sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
+    sc_labels = np.array([c/c.max() for c in sc_labels])
+    # sc_labels = list(map(lambda row: [roundToNearest(c, 0.25) for c in row], sc_labels))
+    sc_labels = [roundToNearest(c, 0.25) for c in sc_labels]
+    sc_labels = pd.DataFrame(np.round(il_labels*sc_labels).astype('uint8'))
+    sc_labels.columns = LABEL_ALIASE_LIST
+
+    df_c = pd.concat([tmp[["ID", 'maskid', 'locations','locations_cleanedup','gene_names','ensembl_ids','atlas_name']], sc_labels], axis=1)
+    labels = df_c[LABEL_ALIASE_LIST].values
+    negatives_idx = np.where(labels.sum(axis=1)==0)[0]
+    df_c.loc[negatives_idx, "Negative"] = 1
+
+    single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
+    single_labels = labels[single_label_idx]
+    idx1 = np.where(single_labels==1)
+    single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
+    multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
+    multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
+
+    multi_labels_names = [np.where(r==1)[0] for r in labels[multi_label_idx]]
+    multi_labels_names = [','.join([LABEL_NAMES[i] for i in r]) for r in multi_labels_names]
+
+    df_c['location'] = 'Negative'
+    df_c['target'] = 'Negative'
+    df_c.loc[single_label_idx, 'location'] = single_labels
+    df_c.loc[single_label_idx, 'target'] = single_labels
+    df_c.loc[multi_label_idx, 'location'] = multi_labels_names
+    df_c.loc[multi_label_idx, 'target'] = multi_labels
+
+    df_c["prob"] = 0
+    for i,row in df_c.iterrows():
+        label = row.target
+        if label == 'Multi-Location':
+            df_c.loc[i,'prob'] = 1
+        else:
+            #print(prediction[prediction.cellid == row.cellid][label].values)
+            df_c.loc[i,'prob'] = prediction[prediction.cellid == row.cellid][label].values[0]
+    df_c.target.value_counts()
+    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21.csv', index=False)
+
 
 if __name__ == '__main__':
     prepare_meta_publicHPA()
