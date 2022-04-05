@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 from numpy.matrixlib.defmatrix import matrix
 import numpy as np
 import os
+import gc
 from sklearn.metrics import f1_score
 #import cv2
 import matplotlib.pyplot as plt
@@ -194,7 +195,8 @@ def prepare_meta_publicHPAv21():
     predictions0 = pd.read_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox.csv')
     predictions0['id'] = [f.split('_',1)[1] for f in predictions0.id]
     prediction = prediction.merge(predictions0.drop(columns=['location_code', 'locations','gene_names', 'ensembl_ids', 'atlas_name','target']), on = ['id'])
-
+    del(predictions0)
+    gc.collect()
     ifimage = pd.read_csv('/data/HPA-IF-images/IF-image.csv')
     ifimage["ID"] = [f.rsplit('/',1)[1][:-1] for f in ifimage.filename]
     ifimage = ifimage[ifimage.ID.isin(prediction.ID)]
@@ -219,6 +221,7 @@ def prepare_meta_publicHPAv21():
         except:
             tmp.append("")
     ifimage["locations_cleanedup"] = tmp
+    print('Done with locations cleanup for HPASC comp')
     ifimage = ifimage.reset_index()
     m = np.zeros((ifimage.shape[0],len(LABEL_ALIASE_LIST)))
     for i,r in ifimage.iterrows():
@@ -227,6 +230,7 @@ def prepare_meta_publicHPAv21():
             for l in ls:
                 m[i,LABEL_NAME_LIST.index(l)] = 1
     m[m!=1]=0
+    print('Done with one-hot encoding for locations_leanedup')
     df = pd.DataFrame(m) # m= matrix of image-level labels
     df.columns = LABEL_ALIASE_LIST
 
@@ -244,11 +248,13 @@ def prepare_meta_publicHPAv21():
     df['target'].value_counts()
     df['ID'] = ifimage.ID
     df = df.merge(ifimage[['ID','locations','locations_cleanedup','gene_names','ensembl_ids','atlas_name']], on=['ID'])
-
-
+    print(f'Current columns: {df.columns}')
     # Merged labels in previous multiplication step, now reformat target column
     tmp = prediction.merge(df, how='inner', on=['ID'])
+    print(f'Current columns: {tmp.columns}')
+    print(f'Current shape: {tmp.shape}')
 
+    # Merge il and sc
     il_labels = tmp[[l+'_y' for l in LABEL_ALIASE_LIST]].values
     sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
     sc_labels = np.array([c/c.max() for c in sc_labels])
@@ -256,40 +262,49 @@ def prepare_meta_publicHPAv21():
     sc_labels = [roundToNearest(c, 0.25) for c in sc_labels]
     sc_labels = pd.DataFrame(np.round(il_labels*sc_labels).astype('uint8'))
     sc_labels.columns = LABEL_ALIASE_LIST
-
-    df_c = pd.concat([tmp[["ID", 'maskid', 'locations','locations_cleanedup','gene_names','ensembl_ids','atlas_name']], sc_labels], axis=1)
+    # Merge the calculated sc_labels back with meta
+    df_c = pd.concat([tmp[['id',"ID", 'maskid', 'locations','locations_cleanedup','gene_names','ensembl_ids','atlas_name','x','y','z','top','left','width','height',"ImageWidth"]], sc_labels], axis=1)
+    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21.csv', index=False)
+    print(f'Wrote intermediate results in {d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21.csv')
+    del(il_labels,sc_labels,df, prediction)
+    gc.collect()
     labels = df_c[LABEL_ALIASE_LIST].values
     negatives_idx = np.where(labels.sum(axis=1)==0)[0]
     df_c.loc[negatives_idx, "Negative"] = 1
-
+    # Find names of single labels and multi labels
     single_label_idx = np.where((labels==1).sum(axis=1)==1)[0]
     single_labels = labels[single_label_idx]
     idx1 = np.where(single_labels==1)
     single_labels = [LABEL_ALIASE_LIST[i] for i in idx1[1]]
     multi_label_idx = np.where((labels==1).sum(axis=1)>1)[0]
     multi_labels = [list(LABEL_NAMES.values())[-1] for i in multi_label_idx]
-
+    # Write single cell multilabel names
     multi_labels_names = [np.where(r==1)[0] for r in labels[multi_label_idx]]
     multi_labels_names = [','.join([LABEL_NAMES[i] for i in r]) for r in multi_labels_names]
-
+    # Fill sc 'location' and target column
     df_c['location'] = 'Negative'
     df_c['target'] = 'Negative'
     df_c.loc[single_label_idx, 'location'] = single_labels
     df_c.loc[single_label_idx, 'target'] = single_labels
     df_c.loc[multi_label_idx, 'location'] = multi_labels_names
     df_c.loc[multi_label_idx, 'target'] = multi_labels
-
-    df_c["prob"] = 0
+    # Add probability
+    sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
+    print(f'sc prob shape {sc_labels.shape}, df shape {df_c.shape}')
+    prob = []
     for i,row in df_c.iterrows():
         label = row.target
         if label == 'Multi-Location':
-            df_c.loc[i,'prob'] = 1
+            prob.append(1)
         else:
-            #print(prediction[prediction.cellid == row.cellid][label].values)
-            df_c.loc[i,'prob'] = prediction[prediction.cellid == row.cellid][label].values[0]
+            prob.append(sc_labels[i,LABEL_ALIASE_LIST.index(label)])
+    df_c["prob"] = prob
     df_c.target.value_counts()
+    print('Keeping these final columns:')
+    print(df_c.columns)
     df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21.csv', index=False)
 
 
 if __name__ == '__main__':
-    prepare_meta_publicHPA()
+    #prepare_meta_publicHPA()
+    prepare_meta_publicHPAv21()
