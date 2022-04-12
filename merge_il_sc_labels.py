@@ -255,16 +255,19 @@ def prepare_meta_publicHPAv21():
     print(f'Current shape: {tmp.shape}')
 
     # Merge il and sc
+    thres_classes = pd.read_csv('/data/kaggle-dataset/mAPscoring/bestfitting/thres_inv3.csv')
+    
+    assert (thres_classes.Alias.values == LABEL_ALIASE_LIST).all()
+    thres_vector = thres_classes.best_threshold
     il_labels = tmp[[l+'_y' for l in LABEL_ALIASE_LIST]].values
     sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
-    sc_labels = np.array([c/c.max() for c in sc_labels])
-    # sc_labels = list(map(lambda row: [roundToNearest(c, 0.25) for c in row], sc_labels))
-    sc_labels = [roundToNearest(c, 0.25) for c in sc_labels]
-    sc_labels = pd.DataFrame(np.round(il_labels*sc_labels).astype('uint8'))
+    sc_labels = np.array([sc_labels.transpose()[c] > thres_vector[c] for c in range(19)]).transpose()
+    #sc_labels = il_labels*sc_labels 
+    sc_labels = pd.DataFrame(sc_labels.astype('uint8'))
     sc_labels.columns = LABEL_ALIASE_LIST
     # Merge the calculated sc_labels back with meta
     df_c = pd.concat([tmp[['id',"ID", 'maskid', 'locations','locations_cleanedup','gene_names','ensembl_ids','atlas_name','x','y','z','top','left','width','height',"ImageWidth"]], sc_labels], axis=1)
-    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21.csv', index=False)
+    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21_lowermerge.csv', index=False)
     print(f'Wrote intermediate results in {d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21.csv')
     del(il_labels,sc_labels,df, prediction)
     gc.collect()
@@ -302,7 +305,8 @@ def prepare_meta_publicHPAv21():
     df_c.target.value_counts()
     print('Keeping these final columns:')
     print(df_c.columns)
-    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21.csv', index=False)
+    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21_individualthresholds.csv', index=False)
+    #df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21_potentialnewlabels.csv', index=False)
 
 
 if __name__ == '__main__':
