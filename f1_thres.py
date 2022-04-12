@@ -30,13 +30,10 @@ LABEL_TO_ALIAS = {
   15: 'Aggresome',
   16: 'Cytosol',
   17: 'VesiclesPCP',
-  18: 'Negative',
-  19:'Multi-Location',
+  18: 'Negative'
 }
-LABEL_ALIASE_LIST = [LABEL_TO_ALIAS[i] for i in range(NUM_CLASSES-1)]
 
-
-matched_cells_path = '/data/kaggle-dataset/mAPscoring/bestfitting/IOU_p_merged.csv'
+matched_cells_path = '/data/kaggle-dataset/mAPscoring/bestfitting/IOU_p_merged_inv3.csv'
 pred = pd.read_csv(matched_cells_path)
 pred.GT_cell_label = [f.replace("['","").replace("']","") for f in pred.GT_cell_label]
 pred = pred[pred.GT_cell_label!='Discard']
@@ -57,4 +54,5 @@ for LABEL, ALIAS in LABEL_TO_ALIAS.items():
 thres_df = pd.DataFrame(thres_df)
 thres_df.columns = ['Label','Alias','n_gt','best_threshold','best_f1']
 print(thres_df)
-thres_df.to_csv('/data/kaggle-dataset/mAPscoring/bestfitting/thres_m6.csv', index=False)
+print(thres_df.best_f1.mean())
+thres_df.to_csv('/data/kaggle-dataset/mAPscoring/bestfitting/thres_inv3.csv', index=False)
