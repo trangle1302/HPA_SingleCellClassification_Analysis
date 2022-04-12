@@ -30,15 +30,17 @@ def __main__(args, process_num=8):
     pred = pd.read_csv(pred_mask_path)
     print("Prediction files have ", len(pred), "lines")
     pred = pred[pred.ID.isin(gt_labels.Image_ID)]
+    # removed empty submission line
+    pred = pred[[len(f.split())>3 for f in pred.PredictionString]]
     meta = pd.read_csv(
         "/home/trangle/Desktop/annotation-tool/HPA-Challenge-2020-all/data_for_Kaggle/images_metadata.csv"
     )
     
     s = time.time()
     #print(f"Images predicted = Images GT {set(gt_labels.Image_ID) == set(pred.ID)}")
-    if os.path.exists(os.path.join(save_dir, "IOU_p_merged.csv")):
+    if os.path.exists(os.path.join(save_dir, "IOU_p_merged_inv3.csv")):
         print(f"Found IOU_p_merged.csv, loading...")
-        df = pd.read_csv(os.path.join(save_dir, "IOU_p_merged.csv"))
+        df = pd.read_csv(os.path.join(save_dir, "IOU_p_merged_inv3.csv"))
         diff = set(gt_labels.Image_ID) - set(df.Image)
         if len(diff)>0:
             print(f"Missing {len(diff)} images, matching them...")
@@ -77,16 +79,16 @@ def run_proc(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
 
 def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
     results = pd.DataFrame()
-    f = open(os.path.join(save_dir, f"IOU_p_{pid}.csv"), "a+")  
+    f = open(os.path.join(save_dir, f"IOU_p_{pid}_inv3.csv"), "a+")  
     f.write("Image;Cell_ID;GT_cell_label;Predicted_cell_label;IOU\n")
     for i, row in tqdm(pred_df[sp:ep].iterrows(), postfix=pid):
         image_id = row.ID
         gt_masks = imread(os.path.join(gt_mask_dir, image_id + "_mask.png"))
         cell_idxes = set(np.unique(gt_masks)).difference([0])
         gt_labels_1image = gt_labels[gt_labels.Image_ID == image_id]
-        #print("have labels but no mask: ",set(gt_labels_1image.Cell_ID).difference(set([str(num) for num in cell_idxes])))
+        print("have labels but no mask: ",set(gt_labels_1image.Cell_ID).difference(set([str(num) for num in cell_idxes])))
         gt_labels_1image = gt_labels_1image[gt_labels_1image.Cell_ID.isin(set([str(num) for num in cell_idxes]))]
-        #print("have mask but no label: ",set([str(num) for num in cell_idxes]).difference(set(gt_labels_1image.Cell_ID)))
+        print("have mask but no label: ",set([str(num) for num in cell_idxes]).difference(set(gt_labels_1image.Cell_ID)))
         assert set(gt_labels_1image.Cell_ID) == set([str(num) for num in cell_idxes])
         # Formating single cell's predictions
         width = row.ImageWidth
@@ -98,7 +100,7 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
         if len(pred_string)%3 ==2:
             pred_string = pred_string[:-2]
         """
-        #print(f"{image_id} has {len(pred_string)/3} predictions")
+        print(f"{image_id} has {len(pred_string)/3} predictions")
         preds = dict()
         for k in range(0, len(pred_string), 3):
             #print(pred_string[k], pred_string[k+1], pred_string[k+2][-5:])
@@ -188,13 +190,14 @@ def cell_matching(pred_df, gt_mask_dir, gt_labels, save_dir, pid, sp, ep):
     f.close()
 
 def merge_df(d, meta):
-    files = [f for f in os.listdir(d) if f.startswith("IOU_p_")]
-    files = [f for f in files if f != "IOU_p_merged.csv"]
+    files = [f for f in os.listdir(d) if f.startswith("IOU_p_") & f.endswith("_inv3.csv")]
+    files = [f for f in files if f != "IOU_p_merged_inv3.csv"]
     #print(d, len(files))
 
     df = pd.DataFrame()
     for f in files:
         df_ = pd.read_csv(os.path.join(d, f), sep=";")
+        print(df_.shape)
         #print(os.path.join(d,f), len(set(df_.Image)), "images")
         dup = df_.duplicated()
         if sum(dup)>0:
@@ -204,8 +207,8 @@ def merge_df(d, meta):
         # print(df_.columns)
         df = df.append(df_, ignore_index=True)
     df_merged = df.merge(meta, right_on="Image_ID", left_on="Image")
-    print(f"Saving merged files to {d}/IOU_p_merged.csv")
-    df_merged.to_csv(os.path.join(d, "IOU_p_merged.csv"), index=False)
+    print(f"Saving merged files to {d}/IOU_p_merged_inv3.csv")
+    df_merged.to_csv(os.path.join(d, "IOU_p_merged_inv3.csv"), index=False)
     df_ = df_merged[~df_merged.GT_cell_label.isna()]
     df_ = df_[df_.GT_cell_label!="None"]
     # print(df.head(), meta.head())
