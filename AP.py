@@ -43,12 +43,15 @@ def average_precisions(y_true, y_pred):
 
     return average_precisions
 
+def main(d):
+    files = [f for f in os.listdir(d) if not f.endswith("_submission.csv")]
+    df = pd.DataFrame()
+    for f in files:
+        df_ = pd.read_csv(os.path.join(d, f))
+        df = df.append(df_, ignore_index=True)
 
-d = "/home/trangle/HPA_SingleCellClassification/examples/bestfitting"
-files = [f for f in os.listdir(d) if not f.endswith("_submission.csv")]
-df = pd.DataFrame()
-for f in files:
-    df_ = pd.read_csv(os.path.join(d, f))
-    df = df.append(df_, ignore_index=True)
+    # df['GT cell label'] = [f.split("\n")[0].split(" ")[-1] for f in df['GT cell label']]
 
-# df['GT cell label'] = [f.split("\n")[0].split(" ")[-1] for f in df['GT cell label']]
+if __name__ == "__main__":
+    d = "/home/trangle/HPA_SingleCellClassification/examples/bestfitting"
+    main(d)
