@@ -225,3 +225,30 @@ ggplot(df_, aes(x="ShortLabelName", y ="GT_cell_count", fill="ShortLabelName")) 
 
 p = ggplot(df_, aes(x="AP", y ="GT_cell_count", fill="ShortLabelName")) + geom_point() + theme_classic() + xlim(0.2, 0.8) + ylim(0, 12000) + geom_text(aes(label="ShortLabelName"), size=7, angle=20, ha='left', va='bottom') 
 p.save(os.path.join(save_dir, "plots","Cellcounts_vs_AP.jpg"), dpi=600)
+
+### AP vs segmentation
+from scipy.stats import pearsonr
+IOU_dir = "/data/kaggle-dataset/mAPscoring"
+results = []
+teams = os.listdir(IOU_dir)
+for t in teams:
+    if os.path.exists(f'{IOU_dir}/{t}/IOU_p_merged.csv'):
+        iou = pd.read_csv(f'{IOU_dir}/{t}/IOU_p_merged.csv')
+        iou = iou[iou.Cell_ID != 'None']
+        results.append([t, t[:-2], iou.IOU.mean()])
+results = pd.DataFrame(results)
+results.columns = ['foldername','Team_no','meanIOU']
+results.loc[results.foldername == 'bestfitting', 'Team_no'] = '1'
+results.loc[results.foldername == 'redai', 'Team_no'] = '2'
+df['Team_no'] = [f.split('_')[1] for f in df.Team]
+aggregated_performance = df.groupby('Team_no').agg({
+    'AP':'mean',
+    'AP_public': 'mean',
+    'AP_private': 'mean'
+    }).reset_index()
+aggregated_performance = aggregated_performance.merge(results, on='Team_no')
+print('IOU vs AP', pearsonr(aggregated_performance.AP, aggregated_performance.meanIOU))
+print('IOU vs AP_public: pearson r, pval', pearsonr(aggregated_performance.AP_public, aggregated_performance.meanIOU))
+print('IOU vs AP_private: pearson r, pval', pearsonr(aggregated_performance.AP_private, aggregated_performance.meanIOU))
+p = ggplot(aggregated_performance, aes(x="AP", y ="meanIOU")) + geom_point() + theme_classic() + geom_text(aes(label="Team_no"), size=7, ha='left', va='bottom') 
+p.save(os.path.join(save_dir, "plots","IOU_vs_mAP.jpg"), dpi=600)
