@@ -9,3 +9,6 @@ models
 pretrained
 features
 tmp
+test
+**/*.csv
+**/*.xlsx
