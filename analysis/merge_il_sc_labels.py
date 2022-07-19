@@ -261,8 +261,9 @@ def prepare_meta_publicHPAv21():
     thres_vector = thres_classes.best_threshold
     il_labels = tmp[[l+'_y' for l in LABEL_ALIASE_LIST]].values
     sc_labels = tmp[[l+'_x' for l in LABEL_ALIASE_LIST]].values
-    sc_labels = np.array([sc_labels.transpose()[c] > thres_vector[c] for c in range(19)]).transpose()
-    #sc_labels = il_labels*sc_labels 
+    sc_labels = np.array([sc_labels.transpose()[c] > (2*thres_vector[c]) for c in range(19)]).transpose()
+    sc_labels = il_labels*sc_labels 
+    print(sc_labels.shape)
     sc_labels = pd.DataFrame(sc_labels.astype('uint8'))
     sc_labels.columns = LABEL_ALIASE_LIST
     # Merge the calculated sc_labels back with meta
@@ -305,7 +306,7 @@ def prepare_meta_publicHPAv21():
     df_c.target.value_counts()
     print('Keeping these final columns:')
     print(df_c.columns)
-    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21_individualthresholds.csv', index=False)
+    df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21_individualthresholds_il.csv', index=False)
     #df_c.to_csv(f'{d}/sl_pHPA_15_0.05_euclidean_100000_rmoutliers_ilsc_3d_bbox_metav21_potentialnewlabels.csv', index=False)
 
 
