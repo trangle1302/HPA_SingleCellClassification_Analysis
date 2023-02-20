@@ -1,7 +1,9 @@
 # HPA_SingleCellClassification_Analysis
 Analysis for Kaggle Human Protein Atlas Single Cell Classification challenge
 
-This repo is for analysis of the [HPA Single Cell Classification](https://www.kaggle.com/c/hpa-single-cell-image-classification) results. 
+This repo is for analysis of the [HPA Single Cell Classification](https://www.kaggle.com/c/hpa-single-cell-image-classification) results.
+
+The [paper](https://www.nature.com/articles/s41592-022-01606-z) was published in Nature Methods volume 19, pages1221–1229 (2022).
 
 ## Content
 This includes 
